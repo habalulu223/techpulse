@@ -6,18 +6,19 @@
     <title>Desktop Ready</title>
     <link rel='icon' type='image/x-icon' href='/favicon.ico'>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/client_desktop.css') }}">{% include '_dashboard_container_theme.html' %}</head>
-<body data-user-id="{{ current_user.id }}" data-hourly-rate="{{ hourly_rate|tojson }}" data-has-desktop-access="{{ (current_user.pondo >= 1)|tojson }}" data-current-balance="{{ current_user.pondo|tojson }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/client_desktop.css') }}">
+{% include '_dashboard_container_theme.html' %}</head>
+<body data-user-id="{{ current_user.id }}" data-hourly-rate="{{ hourly_rate|tojson }}">
     {% include '_animated_background.html' %}
     {% include '_startup_splash.html' %}
     {% include '_loading_overlay.html' %}
     <div class="top">
         <h1>Desktop Ready</h1>
         <div class="top-actions">
-            <button type="button" class="btn minimize-timer-btn" data-action="minimize-desktop">Go to Desktop</button>
+            <button type="button" class="btn minimize-timer-btn" onclick="handleMinimizeClickDesktop(event)">Go to Desktop</button>
             <a class="btn" href="{{ url_for('client_bookings') }}">My Bookings</a>
             <a class="btn" href="{{ url_for('profile.profile_page') }}">My Profile</a>
-            <a class="btn warn" href="{{ url_for('logout') }}" data-action="clear-timer-state">Sign Out</a>
+            <a class="btn warn" href="{{ url_for('logout') }}" onclick="clearDashboardTimerState()">Sign Out</a>
         </div>
     </div>
 
@@ -48,7 +49,7 @@
                 <strong class="status-value" id="dashboard-timer-cost">PHP 0.00</strong>
             </div>
         </div>
-        <div class="u-style-1 subtle" id="dashboard-timer-note">
+        <div class="subtle" id="dashboard-timer-note" style="margin-top:8px;">
             Your time and cost update automatically while you use the PC.
         </div>
     </div>
@@ -62,32 +63,32 @@
         </div>
 
         <div class="card">
-            <h2> class="u-style-2"Add Balance</h2>
+            <h2 style="margin-top:0; font-family: Inter, 'Segoe UI', Arial, sans-serif; color: var(--line);">Add Balance</h2>
             <p>
                 Available balance:
                 <strong id="user-balance-bottom" data-balance-display>PHP {{ "%.2f"|format(current_user.pondo) }}</strong>
             </p>
             <form action="{{ url_for('topup_online') }}" method="POST" id="topup-form">
                 <label for="topupAmount">Amount to add</label>
-                <input class="u-style-3" id="topupAmount" type="number" name="amount" min="1" max="10000" step="0.01" placeholder="Example: 100" required>
+                <input id="topupAmount" type="number" name="amount" min="1" max="10000" step="0.01" placeholder="Example: 100" required style="width:100%; box-sizing:border-box; margin: 0 0 8px; padding: 13px; min-height: 48px; border-radius: 6px; border: 1px solid #52617f; background: #0e1422; color: #fff; font-size:1rem;">
                 <input type="hidden" name="return_to" value="{{ url_for('client_desktop') }}">
                 <div class="quick-amounts">
-                    <button type="button" data-action="set-topup" data-amount="100">PHP 100</button>
-                    <button type="button" data-action="set-topup" data-amount="200">PHP 200</button>
-                    <button type="button" data-action="set-topup" data-amount="500">PHP 500</button>
-                    <button type="button" data-action="set-topup" data-amount="1000">PHP 1000</button>
+                    <button type="button" onclick="setTopup(100)">PHP 100</button>
+                    <button type="button" onclick="setTopup(200)">PHP 200</button>
+                    <button type="button" onclick="setTopup(500)">PHP 500</button>
+                    <button type="button" onclick="setTopup(1000)">PHP 1000</button>
                 </div>
-                <button type="submit" class="u-style-4 btn">Next: Pay</button>
+                <button type="submit" class="btn" style="width:100%; margin-top:10px;">Next: Pay</button>
             </form>
             <p class="subtle">Your balance updates after the payment is confirmed.</p>
 
-            <div> class="u-style-5"
-                <h2> class="u-style-6"Recent Payments</h2>
+            <div style="margin-top: 16px;">
+                <h2 style="margin-bottom: 8px; font-size: 1rem;">Recent Payments</h2>
                 {% if recent_payments %}
                     {% for tx in recent_payments %}
                         <div class="history-row">
                             <div class="history-main">
-                                <span> class="u-style-7"{{ tx.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                                <span style="color:#9fbad6;">{{ tx.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
                                 <span style="color: {{ 'var(--ok)' if tx.status == 'paid' else ('var(--warn)' if tx.status == 'cancelled' else '#d3a961') }};">
                                     {{ tx.provider.replace('_', ' ')|upper }} | {{ tx.status|upper }} | PHP {{ "%.2f"|format(tx.amount) }}
                                 </span>
@@ -110,22 +111,22 @@
 
     <div class="actions">
         <a class="btn" href="{{ url_for('client_bookings') }}">My Bookings</a>
-        <button type="button" class="btn minimize-timer-btn" data-action="minimize-desktop">Go to Desktop</button>
+        <button type="button" class="btn minimize-timer-btn" onclick="handleMinimizeClickDesktop(event)">Go to Desktop</button>
     </div>
 
     <!-- Hidden termination dialog -->
-    <div class="u-style-8" id="terminate-dialog">
-        <div> class="u-style-9"
-            <h3> class="u-style-10"Terminate Client App</h3>
-            <p> class="u-style-11"Enter the secret key to terminate the application:</p>
-            <input class="u-style-12" type="password" id="secret-key" placeholder="Enter secret key">
-            <div> class="u-style-13"
-                <button class="u-style-14" id="terminate-btn">Terminate</button>
-                <button class="u-style-15" id="cancel-btn">Cancel</button>
+    <div id="terminate-dialog" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center;">
+        <div style="background: var(--card); padding: 20px; border-radius: 8px; border: 2px solid var(--warn); max-width: 400px; width: 90%;">
+            <h3 style="color: var(--warn); margin-top: 0;">Terminate Client App</h3>
+            <p style="margin-bottom: 15px; color: var(--text);">Enter the secret key to terminate the application:</p>
+            <input type="password" id="secret-key" style="width: 100%; padding: 10px; margin-bottom: 15px; background: #0e1422; border: 1px solid #37415f; color: #fff; border-radius: 4px;" placeholder="Enter secret key">
+            <div style="display: flex; gap: 10px;">
+                <button id="terminate-btn" style="flex: 1; background: var(--warn); color: #fff; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">Terminate</button>
+                <button id="cancel-btn" style="flex: 1; background: transparent; color: var(--text); border: 1px solid #37415f; padding: 10px; border-radius: 4px; cursor: pointer;">Cancel</button>
             </div>
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/client_desktop.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/client_desktop.js') }}" defer></script>
 </body>
 </html>

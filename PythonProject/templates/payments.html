@@ -6,7 +6,8 @@
     <title>Payment Logs</title>
     <link rel='icon' type='image/x-icon' href='/favicon.ico'>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/payments.css') }}">{% include '_dashboard_container_theme.html' %}</head>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/payments.css') }}">
+{% include '_dashboard_container_theme.html' %}</head>
 <body>
     {% include '_dashboard_nav.html' %}
     {% include '_loading_overlay.html' %}
@@ -30,6 +31,7 @@
             <div class="muted">Select a payment row, then press confirm to credit the user balance and mark the payment as paid.</div>
 
             <form method="POST" action="{{ url_for('admin_confirm_payment') }}">
+                <div class="table-scroll">
                 <table>
                     <thead>
                         <tr>
@@ -50,7 +52,7 @@
                                 <input type="radio" name="payment_id" value="{{ tx.id }}" {% if loop.first %}checked{% endif %} {% if tx.status == 'paid' %}data-paid="1"{% endif %} {% if tx.status == 'cancelled' %}data-cancelled="1"{% endif %}>
                             </td>
                             <td data-label="Created">{{ tx.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                            <td class="u-style-1" data-label="User">{{ tx.display_username }}</td>
+                            <td data-label="User" style="font-weight:700; color:#fff;">{{ tx.display_username }}</td>
                             <td data-label="Provider">{{ tx.provider.replace('_', ' ')|upper }}</td>
                             <td data-label="Reference">{{ tx.external_id }}</td>
                             <td data-label="Amount">PHP {{ "%.2f"|format(tx.amount) }}</td>
@@ -64,6 +66,7 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                </div>
 
                 {% if payments %}
                 <div class="actions">
@@ -75,6 +78,6 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/payments.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/payments.js') }}" defer></script>
 </body>
 </html>

@@ -15,12 +15,12 @@
     <div class="top-bar">
         <h1>{% if current_user.is_admin %}CyberCore // System Dashboard{% else %}Hello {{ current_user.username }} — Your Dashboard{% endif %}</h1>
         <div>
-            <span> class="u-style-1"
-                Logged in as: <strong> class="u-style-2"{{ current_user.username }}</strong>
-                {% if current_user.is_admin %} <span> class="u-style-3"(ADMIN)</span> {% endif %}
+            <span style="color:#aaa; margin-right:15px; font-size: 0.9em;">
+                Logged in as: <strong style="color: white;">{{ current_user.username }}</strong>
+                {% if current_user.is_admin %} <span style="color: var(--neon-red);">(ADMIN)</span> {% endif %}
             </span>
-            {% if current_user.is_admin and mobile_pairing_primary %}<a class="u-style-4 btn" href="{{ url_for('mobile_pairing_page') }}">PHONE QR</a>{% endif %}
-            <a class="u-style-5" href="/logout">LOGOUT</a>
+            {% if current_user.is_admin and mobile_pairing_primary %}<a class="btn" href="{{ url_for('mobile_pairing_page') }}" style="font-size:.72rem;padding:6px 9px;margin-right:8px;">PHONE QR</a>{% endif %}
+            <a href="/logout" style="color:var(--neon-red); text-decoration:none; border:1px solid var(--neon-red); padding:5px 10px; font-size:0.8em; border-radius: 4px;">LOGOUT</a>
         </div>
     </div>
 
@@ -34,20 +34,20 @@
 
     <div class="container">
 
-        <div class="u-style-6 section">
-            <div> class="u-style-7"
+        <div class="section" style="flex: 2;">
+            <div style="display:flex; align-items:center;">
                 <h2>Station Status</h2>
             </div>
             {% if current_user.is_admin %}
-            <div> class="u-style-8"
-                <a href="/admin/download_app" class="u-style-9 btn add-pc-btn">{{ combined_download_label }}</a>
-                <a href="/admin/download_android_app" class="u-style-9 btn add-pc-btn">{{ android_download_label }}</a>
-                <a href="/add_pc" class="u-style-9 btn add-pc-btn">+ ADD NEW PC</a>
-                <a href="/admin/refresh_ips" class="u-style-10 btn add-pc-btn">REFRESH IPs</a>
-                <a href="/admin/auto_assign_ips" class="u-style-9 btn add-pc-btn">AUTO ASSIGN IPs</a>
-                <button id="terminate-sys-btn" class="u-style-11 btn add-pc-btn">TERMINATE SYSTEM</button>
+            <div style="display:flex; align-items:center; margin-top: 10px; margin-bottom: 20px;">
+                <a href="/admin/download_app" class="btn add-pc-btn" style="margin-right: 10px;">{{ combined_download_label }}</a>
+                <a href="/admin/download_android_app" class="btn add-pc-btn" style="margin-right: 10px;">{{ android_download_label }}</a>
+                <a href="/add_pc" class="btn add-pc-btn" style="margin-right: 10px;">+ ADD NEW PC</a>
+                <a href="/admin/refresh_ips" class="btn add-pc-btn" style="border-color: #ffd166; color: #ffd166; margin-right: 10px;">REFRESH IPs</a>
+                <a href="/admin/auto_assign_ips" class="btn add-pc-btn" style="margin-right: 10px;">AUTO ASSIGN IPs</a>
+                <button id="terminate-sys-btn" class="btn add-pc-btn" style="border-color: #ff6b6b; color: #ff6b6b; margin-right: 10px;">TERMINATE SYSTEM</button>
             </div>
-            <p> class="u-style-12"{{ android_download_note }}</p>
+            <p style="margin-top: -10px; margin-bottom: 20px; font-size: 0.8em; color: #8ea4bb;">{{ android_download_note }}</p>
             {% endif %}
 
             {% if current_user.is_admin %}
@@ -65,39 +65,39 @@
             <div class="pc-grid">
                 {% for pc in pcs %}
                 <div class="card {{ 'occupied' if pc.dashboard_in_use else 'free' }}">
-                    <div> class="u-style-13"
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
                         <h3>{{ pc.name }}</h3>
                         <span class="status-badge">{{ 'In Use' if pc.dashboard_in_use else 'Ready' }}</span>
                     </div>
                     {% if current_user.is_admin %}
-                        <p> class="u-style-14"
-                            LAN Target: <strong> class="u-style-15"{{ (pc.lan_ip ~ ':' ~ pc.lan_port) if pc.lan_ip and pc.lan_port else (pc.lan_ip if pc.lan_ip else 'Not assigned') }}</strong>
+                        <p style="color:#bbb; font-size:0.85em; margin: 4px 0 8px;">
+                            LAN Target: <strong style="color:white;">{{ (pc.lan_ip ~ ':' ~ pc.lan_port) if pc.lan_ip and pc.lan_port else (pc.lan_ip if pc.lan_ip else 'Not assigned') }}</strong>
                         </p>
                         <a class="pc-qr-link" href="{{ url_for('admin_pc_qr', pc_id=pc.id) }}">▦ View / Print PC QR</a>
                         <form action="/admin/set_pc_ip/{{ pc.id }}" method="POST">
                             <input type="text" name="lan_ip" placeholder="Set LAN IP (blank to clear)" value="{{ pc.lan_ip or '' }}">
-                            <button class="u-style-16" type="submit">Save LAN IP</button>
+                            <button type="submit" style="width:100%">Save LAN IP</button>
                         </form>
                     {% endif %}
 
                     {% if pc.dashboard_in_use %}
                         {% if pc.dashboard_session %}
-                            <p> class="u-style-17"Logged In: <strong> class="u-style-15"{{ pc.dashboard_session_username or ('User #' ~ pc.dashboard_session.user_id) }}</strong></p>
-                            <p> class="u-style-18"User ID: #{{ pc.dashboard_session.user_id }}</p>
-                            <p> class="u-style-17"Started: {{ pc.dashboard_session.start_time.strftime('%H:%M') }}</p>
-                            <p> class="u-style-17"Used For: <strong> class="u-style-15"{{ pc.dashboard_usage_duration_text }}</strong></p>
+                            <p style="color: #aaa; font-size: 0.9em;">Logged In: <strong style="color:white;">{{ pc.dashboard_session_username or ('User #' ~ pc.dashboard_session.user_id) }}</strong></p>
+                            <p style="color: #777; font-size: 0.82em;">User ID: #{{ pc.dashboard_session.user_id }}</p>
+                            <p style="color: #aaa; font-size: 0.9em;">Started: {{ pc.dashboard_session.start_time.strftime('%H:%M') }}</p>
+                            <p style="color: #aaa; font-size: 0.9em;">Used For: <strong style="color:white;">{{ pc.dashboard_usage_duration_text }}</strong></p>
                             {% if current_user.is_admin %}
                                 <a href="/end_session/{{ pc.dashboard_session.id }}" class="btn btn-red">END SESSION</a>
                             {% else %}
-                                <p> class="u-style-19"SESSION ACTIVE</p>
+                                <p style="color: var(--neon-red); font-size: 0.8em; margin-top: 10px;">SESSION ACTIVE</p>
                             {% endif %}
                         {% elif pc.dashboard_online %}
-                            <p> class="u-style-20"PC is online and treated as in use.</p>
-                            <p> class="u-style-17"Online Since: {{ pc.dashboard_usage_started_text }}</p>
-                            <p> class="u-style-17"Used For: {{ pc.dashboard_usage_duration_text }}</p>
+                            <p style="color: var(--neon-green); font-size: 0.9em;">PC is online and treated as in use.</p>
+                            <p style="color: #aaa; font-size: 0.9em;">Online Since: {{ pc.dashboard_usage_started_text }}</p>
+                            <p style="color: #aaa; font-size: 0.9em;">Used For: {{ pc.dashboard_usage_duration_text }}</p>
                         {% else %}
-                            <p> class="u-style-17"Marked occupied in admin.</p>
-                            <p> class="u-style-21"No active session start time is available for this PC.</p>
+                            <p style="color: #aaa; font-size: 0.9em;">Marked occupied in admin.</p>
+                            <p style="color: #777; font-size: 0.84em;">No active session start time is available for this PC.</p>
                         {% endif %}
                     {% else %}
                         <form action="/book" method="POST" class="booking-form">
@@ -106,15 +106,15 @@
                             <input id="booking_date_{{ pc.id }}" type="date" name="booking_date" class="booking-date-input" min="{{ today_date }}" value="{{ today_date }}" required>
                             <label class="very-simple-label" for="time_slot_{{ pc.id }}">Pick a time</label>
                             <input id="time_slot_{{ pc.id }}" type="time" name="time_slot" class="booking-time-input" required>
-                            <button type="submit" class="u-style-22 btn btn-big">Reserve this PC</button>
+                            <button type="submit" class="btn btn-big" style="background: #d91c39; color: #000; border: none;">Reserve this PC</button>
                         </form>
                     {% endif %}
 
                     {% if current_user.is_admin %}
                         {% if not pc.dashboard_in_use %}
-                        <div> class="u-style-23"
-                            <small> class="u-style-24"Admin Quick Start:</small>
-                            <div> class="u-style-25"
+                        <div style="margin-top:15px; border-top:1px solid #333; padding-top:10px;">
+                            <small style="color:#666; text-transform:uppercase;">Admin Quick Start:</small>
+                            <div style="max-height: 100px; overflow-y: auto;">
                                 {% for user in users %}
                                     <a href="/start_session/{{ pc.id }}/{{ user.id }}" class="walk-in-link">
                                         ▶ Start {{ user.username }}
@@ -123,8 +123,8 @@
                             </div>
                         </div>
                         {% endif %}
-                        <div> class="u-style-26"
-                            <small> class="u-style-24"LAN Command:</small>
+                        <div style="margin-top:12px;">
+                            <small style="color:#666; text-transform:uppercase;">LAN Command:</small>
                             <form action="/pc_command" method="POST">
                                 <input type="hidden" name="pc_id" value="{{ pc.id }}">
                                 <select name="command" required>
@@ -134,12 +134,12 @@
                                     <option value="wake">Wake</option>
                                 </select>
                                 <input type="text" name="reason" maxlength="200" placeholder="Reason (optional)">
-                                <button class="u-style-16" type="submit">Send to {{ pc.name }}</button>
+                                <button type="submit" style="width:100%">Send to {{ pc.name }}</button>
                             </form>
-                            <p> class="u-style-27"Admin power commands now run directly without asking the client user first.</p>
+                            <p style="font-size:0.78em; color:#777; margin:6px 0 0;">Admin power commands now run directly without asking the client user first.</p>
                         </div>
-                        <div> class="u-style-26"
-                            <small> class="u-style-24"Auto Connect Target:</small>
+                        <div style="margin-top:12px;">
+                            <small style="color:#666; text-transform:uppercase;">Auto Connect Target:</small>
                             <form action="/admin/request_connect" method="POST">
                                 <input type="hidden" name="pc_id" value="{{ pc.id }}">
                                 {% if discovered_ips or pc.lan_ip %}
@@ -159,10 +159,10 @@
                                     <input type="text" name="connect_ip" placeholder="Target LAN IP (e.g. 192.168.1.120)" required>
                                 {% endif %}
                                 <input type="number" name="connect_port" min="1024" max="65535" placeholder="Agent Port (default 5001)">
-                                <button class="u-style-16" type="submit">Save/Connect {{ pc.name }}</button>
+                                <button type="submit" style="width:100%">Save/Connect {{ pc.name }}</button>
                             </form>
-                            <form class="u-style-28" action="/admin/clear_pc_commands/{{ pc.id }}" method="POST">
-                                <button type="submit" class="u-style-16 btn btn-red">Clear Pending Commands</button>
+                            <form action="/admin/clear_pc_commands/{{ pc.id }}" method="POST" style="margin-top:8px;">
+                                <button type="submit" class="btn btn-red" style="width:100%">Clear Pending Commands</button>
                             </form>
                         </div>
                     {% endif %}
@@ -171,7 +171,7 @@
             </div>
         </div>
 
-        <div class="u-style-29 section">
+        <div class="section" style="flex: 1;">
             <h2>User Profile</h2>
 
             {% if current_user.is_admin %}
@@ -182,12 +182,12 @@
                 <div id="admin-profile-main" class="admin-tab-panel">
                 {% if mobile_pairing_primary %}
                 <div class="pairing-card">
-                    <small> class="u-style-24"Mobile Pairing</small>
+                    <small style="color:#666; text-transform:uppercase;">Mobile Pairing</small>
                     <h3>Scan from the APK</h3>
-                    <p>Open the phone app, tap <strong> class="u-style-15"Scan Pairing QR</strong>, and point the camera at this code. When the public route is active, the APK can connect from a different network through the internet instead of only over LAN.</p>
+                    <p>Open the phone app, tap <strong style="color:white;">Scan Pairing QR</strong>, and point the camera at this code. When the public route is active, the APK can connect from a different network through the internet instead of only over LAN.</p>
                     <div class="pairing-grid">
                         <div class="pairing-qr">
-                            <img src="{{ mobile_pairing_primary.qr_image_url }}" alt="Techpuls pairing QR code">
+                            <img src="{{ mobile_pairing_primary.qr_image_url }}" alt="TechPulse pairing QR code">
                         </div>
                         <div>
                             <div class="pairing-address">{{ mobile_pairing_primary.address }}</div>
@@ -196,26 +196,26 @@
                             </div>
                             <div class="pairing-links">
                                 <form action="/admin/public_route/start" method="POST">
-                                    <button type="submit" class="u-style-30 btn">START PUBLIC ROUTE</button>
+                                    <button type="submit" class="btn" style="width:100%; margin-top:0;">START PUBLIC ROUTE</button>
                                 </form>
                                 <form action="/admin/public_route/stop" method="POST">
-                                    <button type="submit" class="u-style-31 btn">STOP PUBLIC ROUTE</button>
+                                    <button type="submit" class="btn" style="width:100%; margin-top:0; border-color:#ff6b6b; color:#ff6b6b;">STOP PUBLIC ROUTE</button>
                                 </form>
                             </div>
                             {% if public_tunnel %}
-                            <p> class="u-style-32"
+                            <p style="margin-top:12px; margin-bottom:0; font-size:0.82rem;">
                                 Public route status:
-                                <strong> class="u-style-15"{{ public_tunnel.status|upper }}</strong>
+                                <strong style="color:white;">{{ public_tunnel.status|upper }}</strong>
                                 {% if public_tunnel.url %}
                                     <br>
-                                    <span> class="u-style-33"{{ public_tunnel.url }}</span>
+                                    <span style="word-break:break-all; color:#c8f7de;">{{ public_tunnel.url }}</span>
                                 {% elif public_tunnel.error %}
                                     <br>
-                                    <span> class="u-style-34"{{ public_tunnel.error }}</span>
+                                    <span style="word-break:break-all; color:#ff9a9a;">{{ public_tunnel.error }}</span>
                                 {% endif %}
                             </p>
                             {% endif %}
-                            <p> class="u-style-32"If the QR image does not load, enter <strong> class="u-style-15"{{ mobile_pairing_primary.address }}</strong> manually in the APK.</p>
+                            <p style="margin-top:12px; margin-bottom:0; font-size:0.82rem;">If the QR image does not load, enter <strong style="color:white;">{{ mobile_pairing_primary.address }}</strong> manually in the APK.</p>
                             {% if mobile_pairing_targets|length > 1 %}
                             <div class="pairing-alt-list">
                                 {% for target in mobile_pairing_targets[1:] %}
@@ -227,58 +227,58 @@
                     </div>
                 </div>
                 {% endif %}
-                <div> class="u-style-35"
-                    <a href="/bookings" class="u-style-36 btn">BOOKINGS</a>
-                    <a href="/logs" class="u-style-37 btn">LOGS</a>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <a href="/bookings" class="btn" style="border-color: #d91c39; color: #d91c39; text-align:center;">BOOKINGS</a>
+                    <a href="/logs" class="btn" style="border-color: #aaa; color: #aaa; text-align:center;">LOGS</a>
                 </div>
-                <div> class="u-style-38"
-                    <small> class="u-style-24"LAN Discovery</small>
-                    <p> class="u-style-39"Server LAN IPs (IPv4/IPv6): {{ local_ips|join(', ') if local_ips else 'N/A' }}</p>
+                <div style="margin-bottom:15px; border:1px solid #333; border-radius:8px; padding:12px;">
+                    <small style="color:#666; text-transform:uppercase;">LAN Discovery</small>
+                    <p style="font-size:0.85em; color:#aaa; margin:8px 0 4px;">Server LAN IPs (IPv4/IPv6): {{ local_ips|join(', ') if local_ips else 'N/A' }}</p>
                     {% if lan_summary %}
-                        <p> class="u-style-40"Router: {{ lan_summary.gateway_ipv4 or 'N/A' }} | Mask: {{ lan_summary.subnet_mask or 'N/A' }}</p>
-                        <p> class="u-style-41"Network: {{ lan_summary.cidr }} | Used: {{ lan_summary.used_ipv4_count }}/{{ lan_summary.total_usable_hosts }} | Free: {{ lan_summary.available_ipv4_count }}</p>
+                        <p style="font-size:0.85em; color:#aaa; margin:2px 0 2px;">Router: {{ lan_summary.gateway_ipv4 or 'N/A' }} | Mask: {{ lan_summary.subnet_mask or 'N/A' }}</p>
+                        <p style="font-size:0.85em; color:#aaa; margin:0 0 4px;">Network: {{ lan_summary.cidr }} | Used: {{ lan_summary.used_ipv4_count }}/{{ lan_summary.total_usable_hosts }} | Free: {{ lan_summary.available_ipv4_count }}</p>
                     {% endif %}
                     {% if gateway_scan %}
                         {% if gateway_scan.ok %}
-                            <p> class="u-style-41"Active Clients by Gateway Scan (DNS checked): {{ gateway_scan.client_count }}{% if gateway_scan.stale %} (refreshing...){% endif %}</p>
-                            <div> class="u-style-42"
+                            <p style="font-size:0.85em; color:#aaa; margin:0 0 4px;">Active Clients by Gateway Scan (DNS checked): {{ gateway_scan.client_count }}{% if gateway_scan.stale %} (refreshing...){% endif %}</p>
+                            <div style="max-height:110px; overflow-y:auto; border-top:1px solid #333; padding-top:6px; margin-bottom:6px;">
                                 {% for host in gateway_scan.clients %}
-                                    <div> class="u-style-43"{{ host.ip }} - {{ host.source_pc_name or host.device_name or 'unknown' }}</div>
+                                    <div style="font-size:0.82em; color:#9db0c6;">{{ host.ip }} - {{ host.source_pc_name or host.device_name or 'unknown' }}</div>
                                 {% endfor %}
                                 {% if not gateway_scan.clients %}
-                                    <div> class="u-style-44"No active client hosts found in subnet.</div>
+                                    <div style="font-size:0.85em; color:#666;">No active client hosts found in subnet.</div>
                                 {% endif %}
                             </div>
                         {% else %}
-                            <p> class="u-style-45"Gateway scan: {{ gateway_scan.error }}</p>
+                            <p style="font-size:0.85em; color:#d3a961; margin:0 0 4px;">Gateway scan: {{ gateway_scan.error }}</p>
                         {% endif %}
                     {% endif %}
-                    <p> class="u-style-41"Detected PC/Client IPs (router excluded):</p>
-                    <div> class="u-style-46"
+                    <p style="font-size:0.85em; color:#aaa; margin:0 0 4px;">Detected PC/Client IPs (router excluded):</p>
+                    <div style="max-height:100px; overflow-y:auto; border-top:1px solid #333; padding-top:6px;">
                         {% if discovered_ips %}
                             {% for ip in discovered_ips %}
                                 <div style="font-size:0.85em; color: {{ 'var(--neon-green)' if ip in assigned_ips else '#aaa' }};">{{ ip }}</div>
                             {% endfor %}
                         {% else %}
-                            <div> class="u-style-44"No LAN IPs discovered.</div>
+                            <div style="font-size:0.85em; color:#666;">No LAN IPs discovered.</div>
                         {% endif %}
                     </div>
                 </div>
-                <div> class="u-style-38"
-                    <small> class="u-style-24"Agent Status</small>
-                    <p> class="u-style-47"ONLINE PCs are also shown as in use on the station cards. OFFLINE means no recent agent heartbeat; PC may be on but agent/network may be down.</p>
-                    <div> class="u-style-48"
+                <div style="margin-bottom:15px; border:1px solid #333; border-radius:8px; padding:12px;">
+                    <small style="color:#666; text-transform:uppercase;">Agent Status</small>
+                    <p style="font-size:0.8em; color:#777; margin:6px 0 6px;">ONLINE PCs are also shown as in use on the station cards. OFFLINE means no recent agent heartbeat; PC may be on but agent/network may be down.</p>
+                    <div style="max-height:180px; overflow-y:auto; margin-top:8px; border-top:1px solid #333; padding-top:6px;">
                         {% if agent_status %}
                             {% for row in agent_status %}
-                                <div> class="u-style-49"
-                                    <span> class="u-style-50"{{ row.pc_name }}{% if row.lan_ip %} ({{ row.lan_ip }}){% endif %}</span>
+                                <div style="display:flex; justify-content:space-between; gap:8px; font-size:0.82em; padding:5px 0; border-bottom:1px solid #222;">
+                                    <span style="color:#9db0c6;">{{ row.pc_name }}{% if row.lan_ip %} ({{ row.lan_ip }}){% endif %}</span>
                                     <span style="color: {{ 'var(--neon-green)' if row.online else '#d3a961' }};">{{ 'ONLINE' if row.online else 'OFFLINE' }}</span>
-                                    <span> class="u-style-51"{{ row.seen_text }}</span>
+                                    <span style="color:#aaa;">{{ row.seen_text }}</span>
                                     <span style="color: {{ 'var(--neon-red)' if row.queue_count > 0 else '#666' }};">Q: {{ row.queue_count }}</span>
                                 </div>
                             {% endfor %}
                         {% else %}
-                            <div> class="u-style-44"No agent status data yet.</div>
+                            <div style="font-size:0.85em; color:#666;">No agent status data yet.</div>
                         {% endif %}
                     </div>
                 </div>
@@ -291,15 +291,15 @@
                                 <h3>{{ pc.name }}</h3>
                                 <span class="status-badge">{{ 'In Use' if pc.dashboard_in_use else 'Ready' }}</span>
                             </div>
-                            <p> class="u-style-14"
-                                LAN Target: <strong> class="u-style-15"{{ (pc.lan_ip ~ ':' ~ pc.lan_port) if pc.lan_ip and pc.lan_port else (pc.lan_ip if pc.lan_ip else 'Not assigned') }}</strong>
+                            <p style="color:#bbb; font-size:0.85em; margin: 4px 0 8px;">
+                                LAN Target: <strong style="color:white;">{{ (pc.lan_ip ~ ':' ~ pc.lan_port) if pc.lan_ip and pc.lan_port else (pc.lan_ip if pc.lan_ip else 'Not assigned') }}</strong>
                             </p>
                             {% if pc.dashboard_session %}
-                                <p> class="u-style-52"User: <strong> class="u-style-15"{{ pc.dashboard_session_username or ('User #' ~ pc.dashboard_session.user_id) }}</strong></p>
-                                <p> class="u-style-53"Used For: {{ pc.dashboard_usage_duration_text }}</p>
+                                <p style="color:#aaa; font-size:0.85em; margin:4px 0;">User: <strong style="color:white;">{{ pc.dashboard_session_username or ('User #' ~ pc.dashboard_session.user_id) }}</strong></p>
+                                <p style="color:#aaa; font-size:0.85em; margin:4px 0 8px;">Used For: {{ pc.dashboard_usage_duration_text }}</p>
                                 <a href="/end_session/{{ pc.dashboard_session.id }}" class="btn btn-red admin-fixed-btn full-row">END SESSION</a>
                             {% elif pc.dashboard_online %}
-                                <p> class="u-style-54"Online since {{ pc.dashboard_usage_started_text }}</p>
+                                <p style="color:var(--neon-green); font-size:0.85em; margin:4px 0 8px;">Online since {{ pc.dashboard_usage_started_text }}</p>
                             {% endif %}
 
                             <form action="/admin/set_pc_ip/{{ pc.id }}" method="POST" class="admin-inline-form">
@@ -308,9 +308,9 @@
                             </form>
 
                             {% if not pc.dashboard_in_use %}
-                            <div> class="u-style-55"
-                                <small> class="u-style-24"Quick Start User</small>
-                                <div class="u-style-56 admin-action-grid">
+                            <div style="margin-top:10px;">
+                                <small style="color:#666; text-transform:uppercase;">Quick Start User</small>
+                                <div class="admin-action-grid" style="margin-top:8px; max-height:104px; overflow-y:auto;">
                                     {% for user in users %}
                                         <a href="/start_session/{{ pc.id }}/{{ user.id }}" class="btn admin-fixed-btn">Start {{ user.username }}</a>
                                     {% endfor %}
@@ -364,13 +364,14 @@
                     <p class="friendly-note">Pick a ready computer below and tap the big button to reserve time. If the card is red, the computer is busy. If it is green, it is ready.</p>
                 </div>
                 <div class="nav-grid">
-                    <a href="/bookings" class="u-style-57 btn btn-big">My Bookings</a>
-                    <a href="/logs" class="u-style-58 btn btn-big">History</a>
-                    <a href="/logout" class="u-style-59 btn btn-big">Logout</a>
+                    <a href="/bookings" class="btn btn-big" style="border-color: #d91c39; color: #d91c39;">My Bookings</a>
+                    <a href="/logs" class="btn btn-big" style="border-color: #fff; color: #fff;">History</a>
+                    <a href="/logout" class="btn btn-big" style="border-color: #ff6b6b; color: #ff6b6b;">Logout</a>
                 </div>
             {% endif %}
 
             {% if current_user.is_admin %}
+            <div class="table-scroll">
             <table>
                 <thead>
                     <tr>
@@ -381,20 +382,20 @@
                 <tbody>
                     {% for user in users %}
                     <tr>
-                        <td> class="u-style-60"{{ user.username }}</td>
+                        <td style="font-weight:bold; color:white;">{{ user.username }}</td>
                         <td>
-                            <a href="/force_stop_user/{{ user.id }}" class="u-style-61 btn btn-red">Force Stop</a>
+                            <a href="/force_stop_user/{{ user.id }}" class="btn btn-red" style="margin-top:0; padding:6px 10px;">Force Stop</a>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
             {% endif %}
         </div>
 
     </div>
 
-    <script src="{{ url_for('static', filename='js/index.js') }}" defer></script>
-</body>
+<script src="{{ url_for('static', filename='js/index.js') }}" defer></script></body>
 </html>
 

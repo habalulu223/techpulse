@@ -1324,6 +1324,21 @@ def community_audit(action, table_name, record_id=None, old_value=None, new_valu
         ip_address=request.remote_addr if request else None))
 
 
+def community_borrowing_summary(borrowing):
+    """Name the borrower and the assets behind a borrowing, for audit entries.
+
+    Audit rows only carry a record id otherwise, so the activity log cannot say
+    who borrowed what without re-opening every borrowing.
+    """
+    if borrowing is None:
+        return ''
+    borrower = borrowing.borrower
+    name = ' '.join(part for part in ((borrower.first_name, borrower.last_name) if borrower else ()) if part) \
+        or (f'user #{borrowing.borrower_id}' if borrowing.borrower_id else 'unknown borrower')
+    codes = ', '.join(line.equipment.equipment_code for line in borrowing.items if line.equipment) or 'no items'
+    return f'{name} - {codes} (borrowing #{borrowing.borrowing_id})'
+
+
 def community_notify(user_id, title, message, notification_type='equipment', reference_type=None, reference_id=None):
     db.session.add(CommunityNotification(user_id=user_id, notification_type=notification_type,
         title=title, message=message, reference_type=reference_type, reference_id=reference_id))
@@ -1414,7 +1429,8 @@ def review_borrowing_request(borrowing, decision, account):
         community_notify(borrowing.borrower_id, 'Borrow request declined',
             f'Borrowing #{borrowing.borrowing_id} was declined.', reference_type='borrowings',
             reference_id=borrowing.borrowing_id)
-        community_audit('Declined equipment borrowing', 'borrowings', borrowing.borrowing_id, actor=account)
+        community_audit('Declined equipment borrowing', 'borrowings', borrowing.borrowing_id,
+            actor=account, new_value=community_borrowing_summary(borrowing))
         db.session.commit()
         return 'declined', 'Borrowing request declined.'
     if not all(community_item_available(line.equipment) for line in borrowing.items):
@@ -1427,7 +1443,8 @@ def review_borrowing_request(borrowing, decision, account):
     community_notify(borrowing.borrower_id, 'Borrow request approved',
         f'Borrowing #{borrowing.borrowing_id} is approved.', reference_type='borrowings',
         reference_id=borrowing.borrowing_id)
-    community_audit('Approved equipment borrowing', 'borrowings', borrowing.borrowing_id, actor=account)
+    community_audit('Approved equipment borrowing', 'borrowings', borrowing.borrowing_id,
+        actor=account, new_value=community_borrowing_summary(borrowing))
     db.session.commit()
     return 'approved', 'Borrowing request approved.'
 
@@ -4409,19 +4426,41 @@ def equipment_dashboard():
     active_borrowings = []
     borrowing_history = []
     return_inspections = []
+    borrower_search = (request.args.get('q') or '').strip()
+
+    def by_borrower_name(query):
+        """Restrict a borrowing query to borrowers whose name matches the search box.
+
+        Matches first name, last name or the joined full name so one box finds a
+        person however the register spells them.
+        """
+        if not borrower_search:
+            return query
+        term = f'%{borrower_search}%'
+        return query.join(CommunityUser, CommunityUser.user_id == CommunityBorrowing.borrower_id).filter(db.or_(
+            CommunityUser.first_name.ilike(term),
+            CommunityUser.last_name.ilike(term),
+            (CommunityUser.first_name + ' ' + CommunityUser.last_name).ilike(term)))
+
     if dashboard_view == 'approvals':
         pending_query = CommunityBorrowing.query.filter_by(borrowing_status='Pending')
         if not current_user.is_admin:
             pending_query = pending_query.filter(~CommunityBorrowing.items.any(
                 CommunityBorrowingItem.equipment.has(CommunityEquipment.owner_user_id.isnot(None))))
-        pending_borrowings = pending_query.order_by(
-            CommunityBorrowing.borrow_date.desc()).limit(100).all()
-        active_borrowings = CommunityBorrowing.query.filter(
+        pending_borrowings = by_borrower_name(pending_query).order_by(
+            CommunityBorrowing.borrow_date.desc()).limit(200).all()
+        active_borrowings = by_borrower_name(CommunityBorrowing.query.filter(
             CommunityBorrowing.borrowing_status.in_(['Borrowed', 'Return Requested', 'Overdue'])
-        ).order_by(CommunityBorrowing.expected_return_date).limit(100).all()
-        borrowing_history = CommunityBorrowing.query.order_by(CommunityBorrowing.borrow_date.desc()).limit(50).all()
-        return_inspections = CommunityReturnInspection.query.order_by(
-            CommunityReturnInspection.inspection_date.desc()).limit(50).all()
+        )).order_by(CommunityBorrowing.expected_return_date).limit(200).all()
+        borrowing_history = by_borrower_name(CommunityBorrowing.query).order_by(
+            CommunityBorrowing.borrow_date.desc()).limit(200).all()
+        inspection_query = CommunityReturnInspection.query.join(
+            CommunityBorrowingItem,
+            CommunityBorrowingItem.borrowing_item_id == CommunityReturnInspection.borrowing_item_id
+        ).join(CommunityBorrowing,
+               CommunityBorrowing.borrowing_id == CommunityBorrowingItem.borrowing_id)
+        return_inspections = inspection_query.order_by(
+            CommunityReturnInspection.inspection_date.desc()).limit(200).all()
 
     requests = []
     schedules = []
@@ -4458,6 +4497,7 @@ def equipment_dashboard():
         history=history,
         equipment_status=equipment_status, is_manager=True, role=current_user.role,
         dashboard_view=dashboard_view, dashboard_tabs=dashboard_tabs,
+        borrower_search=borrower_search, now=datetime.now(),
         equipment_total=equipment_total, equipment_page=equipment_page)
 
 
@@ -4597,6 +4637,7 @@ def borrower_dashboard():
         maintenance_requests=[], schedules=[], issues=my_issues, maintenance_records=[], notifications=notifications, audit_logs=[], history=[],
         my_borrowings=borrowings, borrowing_history=[], return_inspections=[], community_users=[],
         equipment_status=equipment_status, is_manager=False, role=current_user.role,
+        borrower_search='', now=datetime.now(),
         instructor_mode=instructor_mode, pending_borrowings=pending_borrowings,
         active_borrowings=active_borrowings,
         instructor_identity_id=identity.user_id,
@@ -4858,7 +4899,8 @@ def community_inspect_return(borrowing_item_id):
         line.borrowing.actual_return_date = datetime.now()
         line.borrowing.borrowing_status = 'Returned'
     community_notify(line.borrowing.borrower_id, 'Equipment return recorded', f'{line.equipment.equipment_code} was checked in as {condition}.', reference_type='borrowings', reference_id=line.borrowing.borrowing_id)
-    community_audit('Inspected equipment return', 'return_inspections', line.borrowing_item_id, new_value=condition)
+    community_audit('Inspected equipment return', 'return_inspections', line.borrowing_item_id,
+        new_value=f'{condition} - {community_borrowing_summary(line.borrowing)}')
     db.session.commit()
     flash('Return inspection saved and equipment status history updated.', 'success')
     return redirect(url_for('equipment_dashboard'))
@@ -5325,8 +5367,8 @@ def dean_dashboard():
 @app.route('/dean/analytics')
 @login_required
 def dean_analytics():
-    if not (current_user.is_admin or current_user.is_dean):
-        flash('Dean Analytics is available only to authorized Dean accounts.', 'error')
+    if not (current_user.is_admin or current_user.is_dean or current_user.can_manage_equipment):
+        flash('Borrowing analytics is available only to staff accounts.', 'error')
         return redirect(url_for('index'))
 
     today = datetime.now().date()
@@ -5698,9 +5740,26 @@ def delete_booking(id):
 @app.route('/logs')
 @login_required
 def view_logs():
-    if not current_user.is_admin: return redirect(url_for('index'))
+    if not (current_user.is_admin or current_user.is_management or current_user.can_manage_equipment):
+        return redirect(url_for('index'))
     logs = AdminLog.query.order_by(AdminLog.timestamp.desc()).all()
-    return render_template('logs.html', logs=logs)
+    # Borrowing approvals and return inspections are recorded in the community
+    # audit table, so without these the log page never shows who borrowed what.
+    borrow_actions = ('Approved equipment borrowing', 'Declined equipment borrowing',
+                      'Inspected equipment return')
+    audits = CommunityAuditLog.query.filter(
+        CommunityAuditLog.action.in_(borrow_actions)).order_by(
+            CommunityAuditLog.created_at.desc()).limit(300).all()
+    entries = [{'timestamp': log.timestamp, 'admin_name': log.admin_name, 'action': log.action}
+               for log in logs]
+    for audit in audits:
+        who = community_display_name(audit.user) or 'system'
+        detail = audit.action
+        if audit.new_value:
+            detail = f'{detail}: {audit.new_value}'
+        entries.append({'timestamp': audit.created_at, 'admin_name': who, 'action': detail})
+    entries.sort(key=lambda row: row['timestamp'] or datetime.min, reverse=True)
+    return render_template('logs.html', logs=entries)
 
 
 @app.route('/admin/payments')

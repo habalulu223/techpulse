@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ item.equipment_name }} QR | Techpuls</title>
+  <title>{{ item.equipment_name }} QR | TechPulse</title>
   <link rel="icon" href="{{ url_for('app_icon') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/equipment_qr.css') }}"></head>
 <body>
@@ -12,7 +12,7 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}
     {% endwith %}
-    <div class="eyebrow">Techpuls equipment identification</div>
+    <div class="eyebrow">TechPulse equipment identification</div>
     <h1>{{ item.equipment_name }}</h1>
     <p class="description">Unique QR label for this registered equipment</p>
     {% if qr %}
@@ -34,7 +34,7 @@
     {% if qr %}<div class="payload">{{ qr.qr_value }}</div>{% endif %}
     <div class="actions">
       {% if qr %}
-        <button type="button" data-action="print">Print label</button>
+        <button type="button" onclick="window.print()">Print label</button>
         <a class="secondary" href="{{ url_for('community_equipment_qr_image', equipment_id=item.equipment_id) }}" download="equipment-{{ item.equipment_code }}-qr.svg">Download SVG</a>
       {% endif %}
       {% if current_user.can_manage_equipment %}
@@ -47,5 +47,5 @@
     </div>
     {% if qr and not qr.is_active %}<p class="hint">This code is deactivated, so scanners will reject it. Reactivate it or print a replacement label.</p>{% endif %}
   </main>
-<script src="{{ url_for('static', filename='js/equipment_qr.js') }}" defer></script></body>
+</body>
 </html>

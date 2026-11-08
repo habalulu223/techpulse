@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dean PC Monitor</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dean.css') }}">  {% include '_dashboard_container_theme.html' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dean.css') }}">
+  {% include '_dashboard_container_theme.html' %}
 </head>
 <body>
   {% include '_dashboard_nav.html' %}
@@ -61,7 +62,7 @@
             Last seen: {{ pc.last_agent_seen_at or 'never' }}
           </p>
           {% for command in ['lock', 'restart', 'shutdown', 'wake'] %}
-            <form class="u-style-1" method="post" action="{{ url_for('dean_pc_command') }}">
+            <form method="post" action="{{ url_for('dean_pc_command') }}" style="display:inline">
               <input type="hidden" name="pc_id" value="{{ pc.id }}">
               <input type="hidden" name="command" value="{{ command }}">
               <button>{{ command|title }}</button>

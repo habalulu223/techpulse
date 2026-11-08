@@ -22,6 +22,7 @@
   --tp-sidebar-line: #26364d;
   --tp-sidebar-ink: #c4d0df;
   --tp-sidebar-hover: #263851;
+  --tp-nav-w: 248px;
   --tp-navy: #17263b;
   --tp-navy-hover: #263851;
   --tp-navy-border: #17263b;
@@ -171,6 +172,9 @@ form { display: grid; gap: 10px; margin: 10px 0; }
 .inline > * { flex: 1 1 140px; }
 
 /* ---- Tables -------------------------------------------------------------- */
+/* Wrap a wide table in this so it scrolls sideways inside the content column
+   instead of forcing the whole document wider and clipping the page. */
+.table-scroll { overflow-x: auto; max-width: 100%; padding-bottom: 4px; }
 table { width: 100%; border-collapse: separate !important; border-spacing: 0 !important; background: #fff !important; border: 1px solid var(--tp-line) !important; border-radius: 12px !important; overflow: hidden; }
 th { background: #f6f8fb !important; color: #46566c !important; font-weight: 700 !important; text-transform: none !important; letter-spacing: normal !important; font-size: inherit; }
 th, td { padding: 12px 14px !important; border-bottom: 1px solid var(--tp-line) !important; text-align: left; vertical-align: top; }
@@ -200,7 +204,7 @@ tr:hover td { background: #fbfcfe; }
    ========================================================================== */
 .dash-nav {
   position: fixed !important; z-index: 40 !important; left: 0 !important; top: 0 !important; bottom: 0 !important; right: auto !important;
-  width: 248px !important; overflow-y: auto !important; overflow-x: hidden !important;
+  width: var(--tp-nav-w) !important; overflow-y: auto !important; overflow-x: hidden !important;
   display: flex !important; flex-direction: column !important; align-items: stretch; gap: 4px;
   padding: 22px 16px !important;
   background: var(--tp-sidebar) !important;
@@ -226,7 +230,7 @@ tr:hover td { background: #fbfcfe; }
 .dash-nav a i, .dash-nav a svg { color: currentColor !important; -webkit-text-fill-color: currentColor !important; }
 .dash-nav .dash-logout { margin-top: auto; }
 
-body:has(.dash-nav) { padding-left: 248px; }
+body:has(.dash-nav) { padding-left: var(--tp-nav-w); }
 body:has(.dash-nav) > .top-bar,
 body:has(.dash-nav) > header,
 body:has(.dash-nav) > .top { margin-left: 0; }
@@ -259,6 +263,14 @@ header, .top-bar, .top, .head {
   border-bottom: 1px solid var(--tp-sidebar-line) !important;
   box-shadow: 0 2px 14px rgba(18, 32, 52, .12) !important;
   max-width: none;
+}
+/* Keep the page header pinned while the content scrolls, matching the fixed sidebar.
+   Scoped to direct children of <body>: headers nested inside sections must stay in
+   normal flow. Stays under the sidebar's z-index of 40 so they never overlap. */
+body > :is(header, .top-bar, .top, .head) {
+  position: sticky !important;
+  top: 0;
+  z-index: 35;
 }
 :is(header, .top-bar, .top, .head) :is(h1, h2, h3, span, small, strong, b, a, .muted, .sub, .identity):not(.profile-avatar-link):not(.header-action-button):not(.btn):not(.button):not(.workspace-link) {
   color: #fff !important;
@@ -321,9 +333,20 @@ a.brand { color: var(--tp-accent-strong); font-weight: 750; text-decoration: non
 .card, .panel, .section { padding: clamp(14px, 2vw, 20px); }
 h2 { font-size: clamp(1rem, 0.4vw + 0.95rem, 1.12rem); }
 
-@media (max-width: 760px) {
+/* Wide-but-not-desktop tiers. The sidebar reserves a fixed column, so narrow that
+   reservation before the content runs out of room, and let header actions wrap
+   instead of being pushed off-screen. */
+@media (max-width: 1360px) {
+  :root { --tp-nav-w: 214px; }
+  main { padding: 18px 20px; }
+  body > :is(header, .top-bar, .top, .head) { flex-wrap: wrap; gap: 10px 18px; }
+}
+
+/* Tablet tier: the sidebar folds into a scrollable top bar so the page keeps its
+   full width instead of squeezing everything beside a fixed column. */
+@media (max-width: 1024px) {
   .dash-nav {
-    position: static; width: auto; bottom: auto;
+    position: static !important; width: auto; bottom: auto;
     flex-direction: row; overflow-x: auto; padding: 10px 14px; gap: 6px;
     border-right: 0; border-bottom: 1px solid var(--tp-sidebar-line);
   }
@@ -331,13 +354,14 @@ h2 { font-size: clamp(1rem, 0.4vw + 0.95rem, 1.12rem); }
   .dash-nav .dash-logout { margin-top: 0; }
   .dash-nav a { white-space: nowrap; flex: 0 0 auto; }
   body:has(.dash-nav) { padding-left: 0; }
+}
+
+/* Phone tier: stacking and type scale, not layout geometry. */
+@media (max-width: 760px) {
   main { padding: 16px; }
-  .view-tabs { padding: 0 16px; }
   .grid, .cards, .columns, .cols { grid-template-columns: 1fr; }
   .analytics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .container { width: calc(100% - 24px); margin: 14px auto; gap: 12px; }
-  /* Tables stay readable: scroll sideways instead of crushing columns. */
-  table { display: block; overflow-x: auto; white-space: nowrap; }
   th, td { padding: 9px 10px !important; font-size: .85rem; }
   .stat b, .stat strong, .metric-value, .analytics-tile strong { font-size: 1.3rem; }
   button, .btn, .button, .workspace-link, input[type=submit], input[type=button], input[type=reset] {

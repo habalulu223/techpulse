@@ -6,7 +6,8 @@
     <title>Select Payment Method</title>
     <link rel='icon' type='image/x-icon' href='/favicon.ico'>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/payment.css') }}">{% include '_dashboard_container_theme.html' %}</head>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/payment.css') }}">
+{% include '_dashboard_container_theme.html' %}</head>
 <body data-paymongo-public-key="{{ paymongo_public_key|tojson }}" data-paymongo-ready="{{ 'true' if paymongo_ready else 'false' }}">
     {% include '_animated_background.html' %}
     {% include '_loading_overlay.html' %}
@@ -108,6 +109,6 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/payment.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/payment.js') }}" defer></script>
 </body>
 </html>

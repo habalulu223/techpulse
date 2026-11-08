@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dean Analytics · Techpuls</title>
+  <title>Dean Analytics · TechPulse</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='professional.css') }}">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" referrerpolicy="no-referrer">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dean_analytics.css') }}"></head>
@@ -11,9 +11,9 @@
   {% include '_dashboard_nav.html' %}
 <div class="top">
   <div class="top-inner">
-    <div><div class="eyebrow">Techpuls · Reports</div><h1><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Dean Analytics</h1><div class="muted">Equipment borrowing activity across campus laboratories.</div></div>
+    <div><div class="eyebrow">TechPulse · Reports</div><h1><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Dean Analytics</h1><div class="muted">Equipment borrowing activity across campus laboratories.</div></div>
     <div class="top-actions dean-head-actions">
-      <a class="header-action-button" href="{{ url_for('role_dashboard') }}" data-action="back"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back</a>
+      <a class="header-action-button" href="{{ url_for('role_dashboard') }}" onclick="if (history.length > 1) { history.back(); return false; }"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back</a>
       <a class="header-action-button" href="{{ url_for('role_dashboard') }}"><i class="fa-solid fa-house" aria-hidden="true"></i> Dashboard</a>
       <a class="header-action-button" href="{{ url_for('equipment_dashboard', view='approvals') }}"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i> Borrow approvals</a>
       <a class="profile-avatar-link" href="{{ url_for('profile.profile_page') }}" aria-label="Open profile" title="Open profile">{% if current_user.profile_picture %}<img src="{{ url_for('profile.profile_picture', v=profile_picture_version) }}" alt="">{% else %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4.25 4.25 0 1 0 0-8.5A4.25 4.25 0 0 0 12 12Zm0 2c-4.42 0-8 2.24-8 5v1.5h16V19c0-2.76-3.58-5-8-5Z"/></svg>{% endif %}</a>
@@ -30,7 +30,7 @@
     <article class="metric"><div class="metric-top"><span class="metric-label">Borrowing records</span><span class="metric-icon"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i></span></div><strong class="metric-value">{{ borrowings_total }}</strong><span class="metric-sub">All borrowing records on file</span></article>
     <article class="metric warn"><div class="metric-top"><span class="metric-label">Pending requests</span><span class="metric-icon"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i></span></div><strong class="metric-value">{{ pending_borrowings }}</strong><span class="metric-sub">Waiting for approval</span></article>
     <article class="metric"><div class="metric-top"><span class="metric-label">Active loans</span><span class="metric-icon"><i class="fa-solid fa-clock" aria-hidden="true"></i></span></div><strong class="metric-value">{{ active_borrowings }}</strong><span class="metric-sub">Borrowed or awaiting return check-in</span></article>
-    <article class="metric danger"><div class="metric-top"><span class="metric-label">Overdue</span><span class="metric-icon"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span></div><strong class="metric-value">{{ overdue_borrowings }}</strong><span class="metric-sub">Past the expected return date</span></article>
+    <article class="metric"><div class="metric-top"><span class="metric-label">Overdue</span><span class="metric-icon"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span></div><strong class="metric-value">{{ overdue_borrowings }}</strong><span class="metric-sub">Past the expected return date</span></article>
   </section>
   <section class="columns">
     <article class="panel"><h2><i class="fa-solid fa-chart-simple" aria-hidden="true"></i> Monthly borrowings</h2><p class="panel-intro">Borrowing records created in the last six months.</p><div class="chart">{% set max_value=monthly_values|max if monthly_values else 0 %}{% for label in monthly_labels %}{% set amount=monthly_values[loop.index0] %}<div class="bar-row"><span>{{ label }}</span><div class="bar-track"><div class="bar-fill" style="width:{{ (amount / max_value * 100) if max_value else 0 }}%"></div></div><span class="bar-value">{{ amount }}</span></div>{% endfor %}</div></article>
@@ -38,5 +38,5 @@
   </section>
   <section class="panel"><h2><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i> Recent borrowing records</h2><p class="panel-intro">The latest borrowing records saved in the system.</p><div class="table-wrap"><table><thead><tr><th>Record</th><th>Borrower</th><th>Equipment</th><th>Borrowed</th><th>Due</th><th>Status</th></tr></thead><tbody>{% for borrowing in recent_borrowings %}<tr><td>#{{ borrowing.borrowing_id }}</td><td>{{ borrowing.borrower.first_name }} {{ borrowing.borrower.last_name }}</td><td class="items-cell">{% for line in borrowing.items %}{{ line.equipment.equipment_name }}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</td><td>{{ borrowing.borrow_date.strftime('%d %b %Y') }}</td><td>{{ borrowing.expected_return_date.strftime('%d %b %Y') }}</td><td><span class="badge {{ borrowing.borrowing_status|lower|replace(' ', '-') }}">{{ borrowing.borrowing_status }}</span></td></tr>{% else %}<tr><td colspan="6">No borrowing records yet.</td></tr>{% endfor %}</tbody></table></div></section>
 </main>
-<script src="{{ url_for('static', filename='js/dean_analytics.js') }}" defer></script></body>
+</body>
 </html>

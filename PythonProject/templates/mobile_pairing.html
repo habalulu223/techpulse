@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Connect Techpuls Mobile</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/mobile_pairing.css') }}">  {% include '_dashboard_container_theme.html' %}
+  <title>Connect TechPulse Mobile</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/mobile_pairing.css') }}">{% include '_dashboard_container_theme.html' %}
 </head>
 <body>
   {% include '_animated_background.html' %}
   <main><section class="card">
-    <h1>Connect the Techpuls mobile app</h1>
+    <h1>Connect the TechPulse mobile app</h1>
     <p class="muted">Open the app, choose <strong>Scan Pairing QR</strong>, and point your camera at this code.</p>
     {% if pairing_primary %}
       <div class="pairing">
         {% if pairing_primary.qr_image_url %}
-          <img class="qr" src="{{ pairing_primary.qr_image_url }}" alt="Techpuls mobile pairing QR code">
+          <img class="qr" src="{{ pairing_primary.qr_image_url }}" alt="TechPulse mobile pairing QR code">
         {% else %}
           <div class="empty">QR rendering is unavailable on this server. Open the mobile app, choose <strong>Enter server address</strong>, and type the address shown beside this box.</div>
         {% endif %}

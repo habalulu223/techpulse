@@ -3,21 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ pc.name }} QR | Techpuls</title>
+  <title>{{ pc.name }} QR | TechPulse</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pc_qr.css') }}"></head>
 <body>
   {% include '_animated_background.html' %}
   <main class="qr-card">
-    <div class="eyebrow">Techpuls PC identification</div>
+    <div class="eyebrow">TechPulse PC identification</div>
     <h1>{{ pc.name }}</h1>
     <p class="description">Unique QR label for this registered PC</p>
     <img class="qr-image" src="{{ url_for('download_pc_qr', pc_id=pc.id) }}" alt="QR code for {{ pc.name }}">
     <div class="payload">PC ID: {{ pc.id }} · Name: {{ pc.name }}</div>
     <div class="actions">
-      <button type="button" data-action="print">Print label</button>
+      <button type="button" onclick="window.print()">Print label</button>
       <a class="secondary" href="{{ url_for('download_pc_qr', pc_id=pc.id) }}">Download PNG</a>
       <a class="secondary" href="{{ url_for('index') }}">Back to dashboard</a>
     </div>
   </main>
-<script src="{{ url_for('static', filename='js/pc_qr.js') }}" defer></script></body>
+</body>
 </html>

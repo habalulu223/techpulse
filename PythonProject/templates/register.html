@@ -2,16 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Join CyberCore</title>
     <link rel='icon' type='image/x-icon' href='/favicon.ico'>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/register.css') }}">{% include '_dashboard_container_theme.html' %}</head>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/register.css') }}">
+{% include '_dashboard_container_theme.html' %}</head>
 <body>
     {% include '_animated_background.html' %}
     {% include '_startup_splash.html' %}
     <div class="register-box">
-        <h1>New User</h1>
+        <h1>New Player</h1>
 
         {% with messages = get_flashed_messages(category_filter=["error"]) %}
             {% if messages %}
@@ -30,6 +31,6 @@
         <a href="/login">Already have an account? Login</a>
     </div>
 
-    <script src="{{ url_for('static', filename='js/register.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/register.js') }}" defer></script>
 </body>
 </html>

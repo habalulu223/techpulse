@@ -1,22 +1,32 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Techpuls Login</title>
-    <link rel='icon' type='image/x-icon' href='/favicon.ico'>
+    <title>TechPulse Login</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">{% include '_dashboard_container_theme.html' %}</head>
+
+    {% include '_dashboard_container_theme.html' %}
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}"></head>
+
 <body class="login-intro startup-active">
+
     {% include '_animated_background.html' %}
     {% include '_startup_splash.html' %}
+
     <div class="login-shell">
         <div class="login-box">
-            <h1>Techpuls Login</h1>
+
+            <h1>TechPulse Login</h1>
             <div class="sub">Sign in to your account to continue.</div>
 
             {% if kiosk_mode %}
-                <div class="warn">Kiosk lock is enabled for this app instance.</div>
+                <div class="warn">
+                    Kiosk lock is enabled for this app instance.
+                </div>
             {% endif %}
 
             {% with messages = get_flashed_messages(category_filter=["error"]) %}
@@ -28,13 +38,50 @@
             {% endwith %}
 
             <form method="POST">
+
                 <label for="username">Username or email</label>
-                <input id="username" type="text" name="username" placeholder="Username or email" required autocomplete="username">
+                <input
+                    id="username"
+                    type="text"
+                    name="username"
+                    placeholder="Username or email"
+                    required
+                    autocomplete="username"
+                >
+
                 <label for="password">Password</label>
+
                 <div class="password-wrap">
-                    <input id="password" type="password" name="password" placeholder="Password" required autocomplete="current-password">
-                    <button type="button" class="password-toggle" id="toggle-password" aria-label="Show password" aria-pressed="false" title="Show password">
-                        <svg class="eye-icon" id="eye-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <input
+                        id="password"
+                        type="password"
+                        name="password"
+                        placeholder="Password"
+                        required
+                        autocomplete="current-password"
+                    >
+
+                    <button
+                        type="button"
+                        class="password-toggle"
+                        id="toggle-password"
+                        aria-label="Show password"
+                        aria-pressed="false"
+                        title="Show password"
+                    >
+                        <svg
+                            class="eye-icon"
+                            id="eye-icon"
+                            viewBox="0 0 24 24"
+                            width="20"
+                            height="20"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                        >
                             <g class="eye-open-group">
                                 <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
                                 <circle cx="12" cy="12" r="3"/>
@@ -43,11 +90,13 @@
                         </svg>
                     </button>
                 </div>
+
                 <button type="submit">Sign In</button>
             </form>
 
             {% if google_oauth_enabled %}
                 <div class="divider">or</div>
+
                 <a href="/auth/google" class="btn-google" aria-label="Sign in with Google">
                     <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true">
                         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -62,12 +111,13 @@
             <div class="register">
                 New here? <a href="/register">Create an account</a>
             </div>
+
             <div class="download">
                 <a href="/download/apk" class="btn">Download APK</a>
             </div>
+
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/login.js') }}" defer></script>
-</body>
+<script src="{{ url_for('static', filename='js/login.js') }}" defer></script></body>
 </html>
