@@ -4,22 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dean Analytics · TechPulse</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='professional.css') }}">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" referrerpolicy="no-referrer">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dean_analytics.css') }}"></head>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dean_analytics.css') }}">
+  {% include '_dashboard_container_theme.html' %}
+</head>
 <body>
   {% include '_dashboard_nav.html' %}
-<div class="top">
-  <div class="top-inner">
-    <div><div class="eyebrow">TechPulse · Reports</div><h1><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Dean Analytics</h1><div class="muted">Equipment borrowing activity across campus laboratories.</div></div>
-    <div class="top-actions dean-head-actions">
-      <a class="header-action-button" href="{{ url_for('role_dashboard') }}" onclick="if (history.length > 1) { history.back(); return false; }"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back</a>
-      <a class="header-action-button" href="{{ url_for('role_dashboard') }}"><i class="fa-solid fa-house" aria-hidden="true"></i> Dashboard</a>
-      <a class="header-action-button" href="{{ url_for('equipment_dashboard', view='approvals') }}"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i> Borrow approvals</a>
-      <a class="profile-avatar-link" href="{{ url_for('profile.profile_page') }}" aria-label="Open profile" title="Open profile">{% if current_user.profile_picture %}<img src="{{ url_for('profile.profile_picture', v=profile_picture_version) }}" alt="">{% else %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4.25 4.25 0 1 0 0-8.5A4.25 4.25 0 0 0 12 12Zm0 2c-4.42 0-8 2.24-8 5v1.5h16V19c0-2.76-3.58-5-8-5Z"/></svg>{% endif %}</a>
-    </div>
-  </div>
-</div>
+  {% set header_title = 'Dean Analytics' %}
+  {% set header_subtitle = 'Equipment borrowing activity across campus laboratories.' %}
+  {% if current_user.is_management %}{% set header_actions = [{'label': 'Borrow approvals', 'url': url_for('equipment_dashboard', view='approvals'), 'icon': 'fa-solid fa-boxes-stacked'}] %}{% endif %}
+  {% include '_app_header.html' %}
 <main class="page">
   {% with messages=get_flashed_messages() %}{% for message in messages %}<div class="flash">{{ message }}</div>{% endfor %}{% endwith %}
   <section class="metrics" aria-label="Analytics summary">

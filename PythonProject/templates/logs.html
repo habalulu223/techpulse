@@ -13,10 +13,11 @@
     {% include '_loading_overlay.html' %}
     {% include '_startup_splash.html' %}
 
-    <a href="/" class="back-btn">← Back to Dashboard</a>
+    {% set header_title = 'Admin Activity Logs' %}
+    {% set header_subtitle = 'Audit trail of administrative actions.' %}
+    {% include '_app_header.html' %}
 
-    <h1>Admin Activity Logs</h1>
-
+    <main>
     <div class="table-scroll">
     <table>
         <thead>
@@ -41,6 +42,7 @@
         </tbody>
     </table>
     </div>
+    </main>
 
 <script src="{{ url_for('static', filename='js/logs.js') }}" defer></script>
 </body>

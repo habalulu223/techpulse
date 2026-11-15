@@ -7,12 +7,48 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">{% include '_dashboard_container_theme.html' %}
 </head>
 <body>
-{% include '_animated_background.html' %}
-<header><div class="head"><a href="{{ url_for('role_dashboard') }}">TechPulse · My profile</a><nav><a href="{{ url_for('role_dashboard') }}">Dashboard</a><a href="{{ url_for('logout') }}">Log out</a></nav></div></header>
-<main>
+{% set header_title = 'My profile' %}
+{% set header_subtitle = 'Manage your account photo, cover, and security.' %}
+{% include '_app_header.html' %}
+<main class="profile-main">
 <h1>My profile</h1>
-<p class="subtitle">Manage your account photo and password.</p>
+<p class="subtitle">Manage your account photo, cover, and security.</p>
 {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="flash {{ category }}" role="status">{{ message }}</div>{% endfor %}{% endwith %}
+
+<div class="profile-hero">
+  <div class="profile-cover{% if profile_user.cover_picture %} has-cover{% endif %}"{% if profile_user.cover_picture %} style="background-image:url('{{ url_for('profile.cover_picture', v=cover_picture_version) }}')"{% endif %}>
+    <div class="cover-actions">
+      <form method="post" enctype="multipart/form-data">
+        <input type="hidden" name="action" value="upload_cover">
+        <input class="cover-file" id="cover-picture" type="file" name="cover_picture" accept="image/png,image/jpeg,image/webp" required onchange="this.form.submit()">
+        <label class="cover-button" for="cover-picture"><i class="fa-regular fa-image" aria-hidden="true"></i> Edit cover photo</label>
+      </form>
+      {% if profile_user.cover_picture %}
+      <form method="post">
+        <input type="hidden" name="action" value="remove_cover">
+        <button class="cover-button cover-button-quiet" type="submit"><i class="fa-solid fa-trash-can" aria-hidden="true"></i> Remove</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="profile-summary">
+    <div class="profile-avatar">
+      {% if profile_user.profile_picture %}<img src="{{ url_for('profile.profile_picture', v=profile_picture_version) }}" alt="Profile picture for {{ profile_name }}">{% else %}<span aria-hidden="true">{{ profile_name[:1]|upper }}</span>{% endif %}
+    </div>
+    <div class="profile-summary-copy">
+      <p class="profile-name">{{ profile_name }}</p>
+      <p class="profile-meta">{{ profile_role }} &middot; @{{ current_user.username }}</p>
+    </div>
+    <div class="profile-actions">
+      <a class="btn btn-secondary" href="{{ url_for('profile.password_page') }}"><i class="fa-solid fa-key" aria-hidden="true"></i> Change password</a>
+      <a class="btn" href="{{ url_for('profile.settings_page') }}"><i class="fa-solid fa-gear" aria-hidden="true"></i> Settings</a>
+    </div>
+  </div>
+</div>
+
+{% set theme_name = 'Dark' if (current_user.theme or 'light') == 'dark' else 'Light' %}
+{% set family_names = {'inter': 'Inter', 'system': 'System', 'serif': 'Serif'} %}
+{% set size_names = {'compact': 'Compact', 'default': 'Default', 'large': 'Large'} %}
 <div class="layout">
 <section class="panel" aria-labelledby="account-heading">
 <h2 id="account-heading">Account details</h2>
@@ -25,20 +61,23 @@
 <input type="hidden" name="action" value="upload_picture">
 <label for="profile-picture">Profile picture</label>
 <input id="profile-picture" type="file" name="profile_picture" accept="image/png,image/jpeg,image/webp" required>
-<span class="help">JPG, PNG, or WebP · up to 2 MB. The image is stored in the account database.</span>
+<span class="help">JPG, PNG, or WebP &middot; up to 2 MB. The image is stored in the account database.</span>
 <div class="actions"><button type="submit">Save picture</button></div>
 </form>
 {% if profile_user.profile_picture %}<form method="post" class="actions"><input type="hidden" name="action" value="remove_picture"><button class="secondary" type="submit">Remove picture</button></form>{% endif %}
 </section>
-<section class="panel" aria-labelledby="password-heading">
-<h2 id="password-heading">Change password</h2>
-<form method="post" autocomplete="off">
-<input type="hidden" name="action" value="change_password">
-<div class="field"><label for="current-password">Current password</label><input id="current-password" name="current_password" type="password" autocomplete="current-password" required></div>
-<div class="field"><label for="new-password">New password</label><input id="new-password" name="new_password" type="password" autocomplete="new-password" minlength="8" required><span class="help">Use at least 8 characters.</span></div>
-<div class="field"><label for="confirm-password">Confirm new password</label><input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" minlength="8" required></div>
-<div class="actions"><button type="submit">Update password</button></div>
-</form>
+
+<section class="panel" aria-labelledby="preferences-heading">
+<h2 id="preferences-heading">Preferences</h2>
+<p class="muted">Personalise how TechPulse looks for your account and manage your password.</p>
+<dl class="details">
+<div class="detail"><dt>Theme</dt><dd>{{ theme_name }}</dd></div>
+<div class="detail"><dt>Font</dt><dd>{{ family_names.get(current_user.font_family or 'inter', 'Inter') }} &middot; {{ size_names.get(current_user.font_size or 'default', 'Default') }}</dd></div>
+<div class="detail"><dt>Cover photo</dt><dd>{{ 'Added' if profile_user.cover_picture else 'Not set' }}</dd></div>
+</dl>
+<div class="actions">
+<a class="btn" href="{{ url_for('profile.settings_page') }}"><i class="fa-solid fa-gear" aria-hidden="true"></i> Open settings</a>
+</div>
 </section>
 </div>
 </main>

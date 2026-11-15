@@ -1,401 +1,328 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CyberCore Cafe</title>
-    <link rel='icon' type='image/x-icon' href='/favicon.ico'>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">{% include '_dashboard_container_theme.html' %}</head>
-<body data-booking-lead-minutes="{{ booking_lead_minutes|tojson }}">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PC Station Monitoring · TechPulse</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">{% include '_dashboard_container_theme.html' %}
+</head>
+<body>
     {% include '_dashboard_nav.html' %}
     {% include '_startup_splash.html' %}
     {% include '_loading_overlay.html' %}
 
-    <div class="top-bar">
-        <h1>{% if current_user.is_admin %}CyberCore // System Dashboard{% else %}Hello {{ current_user.username }} — Your Dashboard{% endif %}</h1>
-        <div>
-            <span style="color:#aaa; margin-right:15px; font-size: 0.9em;">
-                Logged in as: <strong style="color: white;">{{ current_user.username }}</strong>
-                {% if current_user.is_admin %} <span style="color: var(--neon-red);">(ADMIN)</span> {% endif %}
-            </span>
-            {% if current_user.is_admin and mobile_pairing_primary %}<a class="btn" href="{{ url_for('mobile_pairing_page') }}" style="font-size:.72rem;padding:6px 9px;margin-right:8px;">PHONE QR</a>{% endif %}
-            <a href="/logout" style="color:var(--neon-red); text-decoration:none; border:1px solid var(--neon-red); padding:5px 10px; font-size:0.8em; border-radius: 4px;">LOGOUT</a>
-        </div>
-    </div>
+    {% set header_title = 'PC Station Monitoring' %}
+    {% set header_subtitle = 'Live availability, active sessions, and agent health across the campus labs.' %}
+    {% if current_user.is_admin and mobile_pairing_primary %}{% set header_actions = [{'label': 'Mobile pairing', 'url': url_for('mobile_pairing_page'), 'icon': 'fa-solid fa-qrcode'}] %}{% endif %}
+    {% include '_app_header.html' %}
 
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            {% for msg in messages %}
-                <div class="alert">{{ msg }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-
-    <div class="container">
-
-        <div class="section" style="flex: 2;">
-            <div style="display:flex; align-items:center;">
-                <h2>Station Status</h2>
-            </div>
-            {% if current_user.is_admin %}
-            <div style="display:flex; align-items:center; margin-top: 10px; margin-bottom: 20px;">
-                <a href="/admin/download_app" class="btn add-pc-btn" style="margin-right: 10px;">{{ combined_download_label }}</a>
-                <a href="/admin/download_android_app" class="btn add-pc-btn" style="margin-right: 10px;">{{ android_download_label }}</a>
-                <a href="/add_pc" class="btn add-pc-btn" style="margin-right: 10px;">+ ADD NEW PC</a>
-                <a href="/admin/refresh_ips" class="btn add-pc-btn" style="border-color: #ffd166; color: #ffd166; margin-right: 10px;">REFRESH IPs</a>
-                <a href="/admin/auto_assign_ips" class="btn add-pc-btn" style="margin-right: 10px;">AUTO ASSIGN IPs</a>
-                <button id="terminate-sys-btn" class="btn add-pc-btn" style="border-color: #ff6b6b; color: #ff6b6b; margin-right: 10px;">TERMINATE SYSTEM</button>
-            </div>
-            <p style="margin-top: -10px; margin-bottom: 20px; font-size: 0.8em; color: #8ea4bb;">{{ android_download_note }}</p>
+    <main>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash">{{ message }}</div>
+                {% endfor %}
             {% endif %}
+        {% endwith %}
 
-            {% if current_user.is_admin %}
-            <section class="status-chart" aria-label="PC status graph">
-                <div class="status-chart-heading"><div><h3>PC Status Overview</h3><p>Live status across registered computers</p></div><strong>{{ pcs|length }} PCs</strong></div>
-                {% set chart_total = pcs|length %}
-                <div class="status-chart-grid">
-                    {% for metric in pc_status_chart %}
-                    <div><div class="status-chart-label"><span>{{ metric.label }}</span><b>{{ metric.value }}</b></div><div class="status-chart-track"><span style="width:{{ (100 * metric.value / chart_total) if chart_total else 0 }}%;background:{{ metric.color }}"></span></div></div>
-                    {% endfor %}
+        <section class="stats" aria-label="Station summary">
+            <div class="stat"><b>{{ pcs|length }}</b><span>Registered stations</span></div>
+            {% for metric in pc_status_chart %}
+                <div class="stat"><b>{{ metric.value }}</b><span>{{ metric.label }}</span></div>
+            {% endfor %}
+        </section>
+
+        {% if current_user.is_admin %}
+        <section class="panel">
+            <div class="panel-heading">
+                <div>
+                    <h2>Station tools</h2>
+                    <p class="muted">Deploy the client, register stations, and keep LAN addresses current.</p>
+                </div>
+            </div>
+            <div class="toolbar-actions">
+                <a class="btn" href="/admin/download_app">{{ combined_download_label }}</a>
+                <a class="btn" href="/admin/download_android_app">{{ android_download_label }}</a>
+                <a class="btn" href="/add_pc">Add station</a>
+                <a class="btn btn-secondary" href="/admin/refresh_ips">Refresh IPs</a>
+                <a class="btn btn-secondary" href="/admin/auto_assign_ips">Auto-assign IPs</a>
+                <button id="terminate-sys-btn" class="btn btn-red" type="button">Terminate system</button>
+            </div>
+            <p class="muted fine-print">{{ android_download_note }}</p>
+        </section>
+        {% endif %}
+
+        <section class="panel" aria-labelledby="stations-heading">
+            <div class="panel-heading">
+                <div>
+                    <h2 id="stations-heading">Stations</h2>
+                    <p class="muted">Each card shows the current user, session time, and available controls.</p>
+                </div>
+                <span class="badge status-neutral">{{ pcs|length }} total</span>
+            </div>
+
+            {% if pcs %}
+            <div class="station-grid">
+                {% for pc in pcs %}
+                {% set lan_target = (pc.lan_ip ~ ':' ~ pc.lan_port) if pc.lan_ip and pc.lan_port else (pc.lan_ip or 'Not assigned') %}
+                <article class="card station-card {{ 'status-in-use' if pc.dashboard_in_use else 'status-ready' }}">
+                    <div class="station-head">
+                        <div>
+                            <h3>{{ pc.name }}</h3>
+                            {% if pc.room %}<p class="station-room muted">{{ pc.room }}</p>{% endif %}
+                        </div>
+                        <span class="badge {{ 'status-warn' if pc.dashboard_in_use else 'status-ok' }}">{{ 'In use' if pc.dashboard_in_use else 'Ready' }}</span>
+                    </div>
+
+                    {% if current_user.is_admin %}
+                    <dl class="station-meta">
+                        <div><dt>LAN target</dt><dd>{{ lan_target }}</dd></div>
+                        <div><dt>Agent</dt><dd>{{ 'Online' if pc.dashboard_online else 'Offline' }}</dd></div>
+                    </dl>
+                    {% endif %}
+
+                    <div class="station-usage">
+                        {% if pc.dashboard_in_use %}
+                            {% if pc.dashboard_session %}
+                                <p><strong>{{ pc.dashboard_session_username or ('User #' ~ pc.dashboard_session.user_id) }}</strong> is signed in.</p>
+                                <dl>
+                                    <div><dt>Started</dt><dd>{{ pc.dashboard_session.start_time.strftime('%H:%M') }}</dd></div>
+                                    <div><dt>In use for</dt><dd>{{ pc.dashboard_usage_duration_text }}</dd></div>
+                                </dl>
+                                {% if current_user.is_admin %}
+                                    <a class="btn btn-secondary" href="/end_session/{{ pc.dashboard_session.id }}">End session</a>
+                                {% else %}
+                                    <span class="badge status-warn">Session active</span>
+                                {% endif %}
+                            {% elif pc.dashboard_online %}
+                                <p>The lab agent is online and this station is marked in use.</p>
+                                <dl>
+                                    <div><dt>Online since</dt><dd>{{ pc.dashboard_usage_started_text }}</dd></div>
+                                    <div><dt>In use for</dt><dd>{{ pc.dashboard_usage_duration_text }}</dd></div>
+                                </dl>
+                            {% else %}
+                                <p class="muted">Marked occupied by an administrator. No session start time is available.</p>
+                            {% endif %}
+                        {% else %}
+                            <p class="muted">This station is ready for the next session.</p>
+                        {% endif %}
+                    </div>
+
+                    {% if current_user.is_admin %}
+                    <a class="station-qr" href="{{ url_for('admin_pc_qr', pc_id=pc.id) }}"><i class="fa-solid fa-qrcode" aria-hidden="true"></i> View or print PC QR</a>
+
+                    <details class="station-tools">
+                        <summary>Manage station</summary>
+
+                        <form action="/admin/set_pc_ip/{{ pc.id }}" method="post">
+                            <label for="lan_ip_{{ pc.id }}">LAN IP</label>
+                            <input id="lan_ip_{{ pc.id }}" type="text" name="lan_ip" placeholder="e.g. 192.168.1.120" value="{{ pc.lan_ip or '' }}">
+                            <button type="submit">Save LAN IP</button>
+                        </form>
+
+                        {% if not pc.dashboard_in_use %}
+                        <div class="quick-start">
+                            <span class="field-label">Quick start user</span>
+                            <div class="quick-start-list">
+                                {% for user in users %}
+                                    <a href="/start_session/{{ pc.id }}/{{ user.id }}">Start {{ user.username }}</a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <form action="/pc_command" method="post">
+                            <input type="hidden" name="pc_id" value="{{ pc.id }}">
+                            <label for="command_{{ pc.id }}">Send command</label>
+                            <select id="command_{{ pc.id }}" name="command" required>
+                                <option value="lock">Lock</option>
+                                <option value="restart">Restart</option>
+                                <option value="shutdown">Shutdown</option>
+                                <option value="wake">Wake</option>
+                            </select>
+                            <input type="text" name="reason" maxlength="200" placeholder="Reason (optional)">
+                            <button type="submit">Send to {{ pc.name }}</button>
+                        </form>
+
+                        <form action="/admin/request_connect" method="post">
+                            <input type="hidden" name="pc_id" value="{{ pc.id }}">
+                            <label for="connect_ip_{{ pc.id }}">Connect target</label>
+                            {% if discovered_ips or pc.lan_ip %}
+                                <select id="connect_ip_{{ pc.id }}" name="connect_ip" required>
+                                    {% if pc.lan_ip %}
+                                        <option value="{{ pc.lan_ip }}" selected>{{ pc.lan_ip }} (current)</option>
+                                    {% else %}
+                                        <option value="" disabled selected>Select detected IP</option>
+                                    {% endif %}
+                                    {% for ip in discovered_ips %}
+                                        {% if ip != pc.lan_ip %}
+                                            <option value="{{ ip }}">{{ ip }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            {% else %}
+                                <input id="connect_ip_{{ pc.id }}" type="text" name="connect_ip" placeholder="Target LAN IP (e.g. 192.168.1.120)" required>
+                            {% endif %}
+                            <input type="number" name="connect_port" min="1024" max="65535" placeholder="Agent port (default 5001)">
+                            <button type="submit">Save and connect</button>
+                        </form>
+
+                        <form action="/admin/clear_pc_commands/{{ pc.id }}" method="post">
+                            <button type="submit" class="btn-secondary">Clear pending commands</button>
+                        </form>
+                    </details>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+                <p class="empty">No stations have been registered yet.</p>
+            {% endif %}
+        </section>
+
+        {% if current_user.is_admin %}
+        <section class="grid" aria-label="Operations">
+            {% if mobile_pairing_primary %}
+            <section class="panel">
+                <div class="panel-heading">
+                    <div>
+                        <h2>Mobile pairing</h2>
+                        <p class="muted">Open the phone app, choose <strong>Scan pairing QR</strong>, and point the camera at this code.</p>
+                    </div>
+                </div>
+                <div class="pairing-grid">
+                    <div class="pairing-qr">
+                        <img src="{{ mobile_pairing_primary.qr_image_url }}" alt="TechPulse pairing QR code">
+                    </div>
+                    <div class="pairing-copy">
+                        <div class="pairing-address">{{ mobile_pairing_primary.address }}</div>
+                        <p class="muted">If the QR image does not load, enter this address manually in the app.</p>
+                        <div class="inline">
+                            <a class="btn" href="{{ mobile_pairing_primary.pairing_url }}" target="_blank" rel="noreferrer">Open pairing URL</a>
+                        </div>
+                        <div class="inline">
+                            <form action="/admin/public_route/start" method="post">
+                                <button type="submit">Start public route</button>
+                            </form>
+                            <form action="/admin/public_route/stop" method="post">
+                                <button type="submit" class="btn-secondary">Stop public route</button>
+                            </form>
+                        </div>
+                        {% if public_tunnel %}
+                        <p class="muted">
+                            Public route status:
+                            <strong>{{ public_tunnel.status|upper }}</strong>
+                            {% if public_tunnel.url %}
+                                <br><a href="{{ public_tunnel.url }}" target="_blank" rel="noopener">{{ public_tunnel.url }}</a>
+                            {% elif public_tunnel.error %}
+                                <br><span class="text-danger">{{ public_tunnel.error }}</span>
+                            {% endif %}
+                        </p>
+                        {% endif %}
+                        {% if mobile_pairing_targets|length > 1 %}
+                        <div class="pairing-alt-list">
+                            {% for target in mobile_pairing_targets[1:] %}
+                                <div class="pairing-alt-item">Alternate path: {{ target.address }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
             </section>
             {% endif %}
 
-            <div class="pc-grid">
-                {% for pc in pcs %}
-                <div class="card {{ 'occupied' if pc.dashboard_in_use else 'free' }}">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3>{{ pc.name }}</h3>
-                        <span class="status-badge">{{ 'In Use' if pc.dashboard_in_use else 'Ready' }}</span>
-                    </div>
-                    {% if current_user.is_admin %}
-                        <p style="color:#bbb; font-size:0.85em; margin: 4px 0 8px;">
-                            LAN Target: <strong style="color:white;">{{ (pc.lan_ip ~ ':' ~ pc.lan_port) if pc.lan_ip and pc.lan_port else (pc.lan_ip if pc.lan_ip else 'Not assigned') }}</strong>
-                        </p>
-                        <a class="pc-qr-link" href="{{ url_for('admin_pc_qr', pc_id=pc.id) }}">▦ View / Print PC QR</a>
-                        <form action="/admin/set_pc_ip/{{ pc.id }}" method="POST">
-                            <input type="text" name="lan_ip" placeholder="Set LAN IP (blank to clear)" value="{{ pc.lan_ip or '' }}">
-                            <button type="submit" style="width:100%">Save LAN IP</button>
-                        </form>
-                    {% endif %}
-
-                    {% if pc.dashboard_in_use %}
-                        {% if pc.dashboard_session %}
-                            <p style="color: #aaa; font-size: 0.9em;">Logged In: <strong style="color:white;">{{ pc.dashboard_session_username or ('User #' ~ pc.dashboard_session.user_id) }}</strong></p>
-                            <p style="color: #777; font-size: 0.82em;">User ID: #{{ pc.dashboard_session.user_id }}</p>
-                            <p style="color: #aaa; font-size: 0.9em;">Started: {{ pc.dashboard_session.start_time.strftime('%H:%M') }}</p>
-                            <p style="color: #aaa; font-size: 0.9em;">Used For: <strong style="color:white;">{{ pc.dashboard_usage_duration_text }}</strong></p>
-                            {% if current_user.is_admin %}
-                                <a href="/end_session/{{ pc.dashboard_session.id }}" class="btn btn-red">END SESSION</a>
-                            {% else %}
-                                <p style="color: var(--neon-red); font-size: 0.8em; margin-top: 10px;">SESSION ACTIVE</p>
-                            {% endif %}
-                        {% elif pc.dashboard_online %}
-                            <p style="color: var(--neon-green); font-size: 0.9em;">PC is online and treated as in use.</p>
-                            <p style="color: #aaa; font-size: 0.9em;">Online Since: {{ pc.dashboard_usage_started_text }}</p>
-                            <p style="color: #aaa; font-size: 0.9em;">Used For: {{ pc.dashboard_usage_duration_text }}</p>
-                        {% else %}
-                            <p style="color: #aaa; font-size: 0.9em;">Marked occupied in admin.</p>
-                            <p style="color: #777; font-size: 0.84em;">No active session start time is available for this PC.</p>
-                        {% endif %}
-                    {% else %}
-                        <form action="/book" method="POST" class="booking-form">
-                            <input type="hidden" name="pc_id" value="{{ pc.id }}">
-                            <label class="very-simple-label" for="booking_date_{{ pc.id }}">Pick a date</label>
-                            <input id="booking_date_{{ pc.id }}" type="date" name="booking_date" class="booking-date-input" min="{{ today_date }}" value="{{ today_date }}" required>
-                            <label class="very-simple-label" for="time_slot_{{ pc.id }}">Pick a time</label>
-                            <input id="time_slot_{{ pc.id }}" type="time" name="time_slot" class="booking-time-input" required>
-                            <button type="submit" class="btn btn-big" style="background: #d91c39; color: #000; border: none;">Reserve this PC</button>
-                        </form>
-                    {% endif %}
-
-                    {% if current_user.is_admin %}
-                        {% if not pc.dashboard_in_use %}
-                        <div style="margin-top:15px; border-top:1px solid #333; padding-top:10px;">
-                            <small style="color:#666; text-transform:uppercase;">Admin Quick Start:</small>
-                            <div style="max-height: 100px; overflow-y: auto;">
-                                {% for user in users %}
-                                    <a href="/start_session/{{ pc.id }}/{{ user.id }}" class="walk-in-link">
-                                        ▶ Start {{ user.username }}
-                                    </a>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        {% endif %}
-                        <div style="margin-top:12px;">
-                            <small style="color:#666; text-transform:uppercase;">LAN Command:</small>
-                            <form action="/pc_command" method="POST">
-                                <input type="hidden" name="pc_id" value="{{ pc.id }}">
-                                <select name="command" required>
-                                    <option value="lock">Lock</option>
-                                    <option value="restart">Restart</option>
-                                    <option value="shutdown">Shutdown</option>
-                                    <option value="wake">Wake</option>
-                                </select>
-                                <input type="text" name="reason" maxlength="200" placeholder="Reason (optional)">
-                                <button type="submit" style="width:100%">Send to {{ pc.name }}</button>
-                            </form>
-                            <p style="font-size:0.78em; color:#777; margin:6px 0 0;">Admin power commands now run directly without asking the client user first.</p>
-                        </div>
-                        <div style="margin-top:12px;">
-                            <small style="color:#666; text-transform:uppercase;">Auto Connect Target:</small>
-                            <form action="/admin/request_connect" method="POST">
-                                <input type="hidden" name="pc_id" value="{{ pc.id }}">
-                                {% if discovered_ips or pc.lan_ip %}
-                                    <select name="connect_ip" required>
-                                        {% if pc.lan_ip %}
-                                            <option value="{{ pc.lan_ip }}" selected>{{ pc.lan_ip }} (current)</option>
-                                        {% else %}
-                                            <option value="" disabled selected>Select detected IP</option>
-                                        {% endif %}
-                                        {% for ip in discovered_ips %}
-                                            {% if ip != pc.lan_ip %}
-                                                <option value="{{ ip }}">{{ ip }}</option>
-                                            {% endif %}
-                                        {% endfor %}
-                                    </select>
-                                {% else %}
-                                    <input type="text" name="connect_ip" placeholder="Target LAN IP (e.g. 192.168.1.120)" required>
-                                {% endif %}
-                                <input type="number" name="connect_port" min="1024" max="65535" placeholder="Agent Port (default 5001)">
-                                <button type="submit" style="width:100%">Save/Connect {{ pc.name }}</button>
-                            </form>
-                            <form action="/admin/clear_pc_commands/{{ pc.id }}" method="POST" style="margin-top:8px;">
-                                <button type="submit" class="btn btn-red" style="width:100%">Clear Pending Commands</button>
-                            </form>
-                        </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="section" style="flex: 1;">
-            <h2>User Profile</h2>
-
-            {% if current_user.is_admin %}
-                <div class="admin-profile-tabs" role="tablist" aria-label="Admin profile sections">
-                    <button type="button" class="btn admin-profile-tab active" data-admin-tab-target="admin-profile-main" data-tab-switch aria-selected="true">Profile</button>
-                    <button type="button" class="btn admin-profile-tab" data-admin-tab-target="admin-profile-pcs" data-tab-switch aria-selected="false">PC Availability</button>
-                </div>
-                <div id="admin-profile-main" class="admin-tab-panel">
-                {% if mobile_pairing_primary %}
-                <div class="pairing-card">
-                    <small style="color:#666; text-transform:uppercase;">Mobile Pairing</small>
-                    <h3>Scan from the APK</h3>
-                    <p>Open the phone app, tap <strong style="color:white;">Scan Pairing QR</strong>, and point the camera at this code. When the public route is active, the APK can connect from a different network through the internet instead of only over LAN.</p>
-                    <div class="pairing-grid">
-                        <div class="pairing-qr">
-                            <img src="{{ mobile_pairing_primary.qr_image_url }}" alt="TechPulse pairing QR code">
-                        </div>
-                        <div>
-                            <div class="pairing-address">{{ mobile_pairing_primary.address }}</div>
-                            <div class="pairing-links">
-                                <a href="{{ mobile_pairing_primary.pairing_url }}" class="btn" target="_blank" rel="noreferrer">OPEN PAIRING URL</a>
-                            </div>
-                            <div class="pairing-links">
-                                <form action="/admin/public_route/start" method="POST">
-                                    <button type="submit" class="btn" style="width:100%; margin-top:0;">START PUBLIC ROUTE</button>
-                                </form>
-                                <form action="/admin/public_route/stop" method="POST">
-                                    <button type="submit" class="btn" style="width:100%; margin-top:0; border-color:#ff6b6b; color:#ff6b6b;">STOP PUBLIC ROUTE</button>
-                                </form>
-                            </div>
-                            {% if public_tunnel %}
-                            <p style="margin-top:12px; margin-bottom:0; font-size:0.82rem;">
-                                Public route status:
-                                <strong style="color:white;">{{ public_tunnel.status|upper }}</strong>
-                                {% if public_tunnel.url %}
-                                    <br>
-                                    <span style="word-break:break-all; color:#c8f7de;">{{ public_tunnel.url }}</span>
-                                {% elif public_tunnel.error %}
-                                    <br>
-                                    <span style="word-break:break-all; color:#ff9a9a;">{{ public_tunnel.error }}</span>
-                                {% endif %}
-                            </p>
-                            {% endif %}
-                            <p style="margin-top:12px; margin-bottom:0; font-size:0.82rem;">If the QR image does not load, enter <strong style="color:white;">{{ mobile_pairing_primary.address }}</strong> manually in the APK.</p>
-                            {% if mobile_pairing_targets|length > 1 %}
-                            <div class="pairing-alt-list">
-                                {% for target in mobile_pairing_targets[1:] %}
-                                <div class="pairing-alt-item">Alternate path: {{ target.address }}</div>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                    <a href="/bookings" class="btn" style="border-color: #d91c39; color: #d91c39; text-align:center;">BOOKINGS</a>
-                    <a href="/logs" class="btn" style="border-color: #aaa; color: #aaa; text-align:center;">LOGS</a>
-                </div>
-                <div style="margin-bottom:15px; border:1px solid #333; border-radius:8px; padding:12px;">
-                    <small style="color:#666; text-transform:uppercase;">LAN Discovery</small>
-                    <p style="font-size:0.85em; color:#aaa; margin:8px 0 4px;">Server LAN IPs (IPv4/IPv6): {{ local_ips|join(', ') if local_ips else 'N/A' }}</p>
+            <section class="panel">
+                <h2>Network discovery</h2>
+                <div class="network-list">
+                    <div class="network-row"><span>Server LAN IPs</span><strong>{{ local_ips|join(', ') if local_ips else 'Not available' }}</strong></div>
                     {% if lan_summary %}
-                        <p style="font-size:0.85em; color:#aaa; margin:2px 0 2px;">Router: {{ lan_summary.gateway_ipv4 or 'N/A' }} | Mask: {{ lan_summary.subnet_mask or 'N/A' }}</p>
-                        <p style="font-size:0.85em; color:#aaa; margin:0 0 4px;">Network: {{ lan_summary.cidr }} | Used: {{ lan_summary.used_ipv4_count }}/{{ lan_summary.total_usable_hosts }} | Free: {{ lan_summary.available_ipv4_count }}</p>
+                    <div class="network-row"><span>Router</span><strong>{{ lan_summary.gateway_ipv4 or 'Not available' }}</strong></div>
+                    <div class="network-row"><span>Subnet mask</span><strong>{{ lan_summary.subnet_mask or 'Not available' }}</strong></div>
+                    <div class="network-row"><span>Network</span><strong>{{ lan_summary.cidr }}</strong></div>
+                    <div class="network-row"><span>Address usage</span><strong>{{ lan_summary.used_ipv4_count }}/{{ lan_summary.total_usable_hosts }} used · {{ lan_summary.available_ipv4_count }} free</strong></div>
                     {% endif %}
-                    {% if gateway_scan %}
-                        {% if gateway_scan.ok %}
-                            <p style="font-size:0.85em; color:#aaa; margin:0 0 4px;">Active Clients by Gateway Scan (DNS checked): {{ gateway_scan.client_count }}{% if gateway_scan.stale %} (refreshing...){% endif %}</p>
-                            <div style="max-height:110px; overflow-y:auto; border-top:1px solid #333; padding-top:6px; margin-bottom:6px;">
-                                {% for host in gateway_scan.clients %}
-                                    <div style="font-size:0.82em; color:#9db0c6;">{{ host.ip }} - {{ host.source_pc_name or host.device_name or 'unknown' }}</div>
-                                {% endfor %}
-                                {% if not gateway_scan.clients %}
-                                    <div style="font-size:0.85em; color:#666;">No active client hosts found in subnet.</div>
-                                {% endif %}
-                            </div>
-                        {% else %}
-                            <p style="font-size:0.85em; color:#d3a961; margin:0 0 4px;">Gateway scan: {{ gateway_scan.error }}</p>
-                        {% endif %}
-                    {% endif %}
-                    <p style="font-size:0.85em; color:#aaa; margin:0 0 4px;">Detected PC/Client IPs (router excluded):</p>
-                    <div style="max-height:100px; overflow-y:auto; border-top:1px solid #333; padding-top:6px;">
-                        {% if discovered_ips %}
-                            {% for ip in discovered_ips %}
-                                <div style="font-size:0.85em; color: {{ 'var(--neon-green)' if ip in assigned_ips else '#aaa' }};">{{ ip }}</div>
+                </div>
+
+                {% if gateway_scan %}
+                    <p class="section-label">Gateway scan</p>
+                    {% if gateway_scan.ok %}
+                        <p class="muted">Active clients: {{ gateway_scan.client_count }}{% if gateway_scan.stale %} · refreshing{% endif %}</p>
+                        <div class="network-list compact">
+                            {% for host in gateway_scan.clients %}
+                                <div class="network-row"><span>{{ host.ip }}</span><strong>{{ host.source_pc_name or host.device_name or 'Unknown device' }}</strong></div>
+                            {% else %}
+                                <p class="empty">No active client hosts found in this subnet.</p>
                             {% endfor %}
-                        {% else %}
-                            <div style="font-size:0.85em; color:#666;">No LAN IPs discovered.</div>
-                        {% endif %}
-                    </div>
-                </div>
-                <div style="margin-bottom:15px; border:1px solid #333; border-radius:8px; padding:12px;">
-                    <small style="color:#666; text-transform:uppercase;">Agent Status</small>
-                    <p style="font-size:0.8em; color:#777; margin:6px 0 6px;">ONLINE PCs are also shown as in use on the station cards. OFFLINE means no recent agent heartbeat; PC may be on but agent/network may be down.</p>
-                    <div style="max-height:180px; overflow-y:auto; margin-top:8px; border-top:1px solid #333; padding-top:6px;">
-                        {% if agent_status %}
-                            {% for row in agent_status %}
-                                <div style="display:flex; justify-content:space-between; gap:8px; font-size:0.82em; padding:5px 0; border-bottom:1px solid #222;">
-                                    <span style="color:#9db0c6;">{{ row.pc_name }}{% if row.lan_ip %} ({{ row.lan_ip }}){% endif %}</span>
-                                    <span style="color: {{ 'var(--neon-green)' if row.online else '#d3a961' }};">{{ 'ONLINE' if row.online else 'OFFLINE' }}</span>
-                                    <span style="color:#aaa;">{{ row.seen_text }}</span>
-                                    <span style="color: {{ 'var(--neon-red)' if row.queue_count > 0 else '#666' }};">Q: {{ row.queue_count }}</span>
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <div style="font-size:0.85em; color:#666;">No agent status data yet.</div>
-                        {% endif %}
-                    </div>
-                </div>
-                </div>
-                <div id="admin-profile-pcs" class="admin-tab-panel" hidden>
-                    <div class="admin-pc-list">
-                        {% for pc in pcs %}
-                        <div class="admin-pc-panel {{ 'occupied' if pc.dashboard_in_use else 'free' }}">
-                            <div class="admin-pc-head">
-                                <h3>{{ pc.name }}</h3>
-                                <span class="status-badge">{{ 'In Use' if pc.dashboard_in_use else 'Ready' }}</span>
-                            </div>
-                            <p style="color:#bbb; font-size:0.85em; margin: 4px 0 8px;">
-                                LAN Target: <strong style="color:white;">{{ (pc.lan_ip ~ ':' ~ pc.lan_port) if pc.lan_ip and pc.lan_port else (pc.lan_ip if pc.lan_ip else 'Not assigned') }}</strong>
-                            </p>
-                            {% if pc.dashboard_session %}
-                                <p style="color:#aaa; font-size:0.85em; margin:4px 0;">User: <strong style="color:white;">{{ pc.dashboard_session_username or ('User #' ~ pc.dashboard_session.user_id) }}</strong></p>
-                                <p style="color:#aaa; font-size:0.85em; margin:4px 0 8px;">Used For: {{ pc.dashboard_usage_duration_text }}</p>
-                                <a href="/end_session/{{ pc.dashboard_session.id }}" class="btn btn-red admin-fixed-btn full-row">END SESSION</a>
-                            {% elif pc.dashboard_online %}
-                                <p style="color:var(--neon-green); font-size:0.85em; margin:4px 0 8px;">Online since {{ pc.dashboard_usage_started_text }}</p>
-                            {% endif %}
-
-                            <form action="/admin/set_pc_ip/{{ pc.id }}" method="POST" class="admin-inline-form">
-                                <input type="text" name="lan_ip" placeholder="Set LAN IP (blank to clear)" value="{{ pc.lan_ip or '' }}">
-                                <button type="submit" class="admin-fixed-btn">Save LAN IP</button>
-                            </form>
-
-                            {% if not pc.dashboard_in_use %}
-                            <div style="margin-top:10px;">
-                                <small style="color:#666; text-transform:uppercase;">Quick Start User</small>
-                                <div class="admin-action-grid" style="margin-top:8px; max-height:104px; overflow-y:auto;">
-                                    {% for user in users %}
-                                        <a href="/start_session/{{ pc.id }}/{{ user.id }}" class="btn admin-fixed-btn">Start {{ user.username }}</a>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                            {% endif %}
-
-                            <form action="/pc_command" method="POST" class="admin-inline-form">
-                                <input type="hidden" name="pc_id" value="{{ pc.id }}">
-                                <select name="command" required>
-                                    <option value="lock">Lock</option>
-                                    <option value="restart">Restart</option>
-                                    <option value="shutdown">Shutdown</option>
-                                    <option value="wake">Wake</option>
-                                </select>
-                                <input type="text" name="reason" maxlength="200" placeholder="Reason (optional)">
-                                <button type="submit" class="admin-fixed-btn">Send Command</button>
-                            </form>
-
-                            <form action="/admin/request_connect" method="POST" class="admin-inline-form">
-                                <input type="hidden" name="pc_id" value="{{ pc.id }}">
-                                {% if discovered_ips or pc.lan_ip %}
-                                    <select name="connect_ip" required>
-                                        {% if pc.lan_ip %}
-                                            <option value="{{ pc.lan_ip }}" selected>{{ pc.lan_ip }} (current)</option>
-                                        {% else %}
-                                            <option value="" disabled selected>Select detected IP</option>
-                                        {% endif %}
-                                        {% for ip in discovered_ips %}
-                                            {% if ip != pc.lan_ip %}
-                                                <option value="{{ ip }}">{{ ip }}</option>
-                                            {% endif %}
-                                        {% endfor %}
-                                    </select>
-                                {% else %}
-                                    <input type="text" name="connect_ip" placeholder="Target LAN IP (e.g. 192.168.1.120)" required>
-                                {% endif %}
-                                <input type="number" name="connect_port" min="1024" max="65535" placeholder="Agent Port (default 5001)">
-                                <button type="submit" class="admin-fixed-btn">Save/Connect</button>
-                            </form>
-                            <form action="/admin/clear_pc_commands/{{ pc.id }}" method="POST" class="admin-inline-form">
-                                <button type="submit" class="btn btn-red admin-fixed-btn">Clear Commands</button>
-                            </form>
                         </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            {% else %}
-                <div class="user-guidance">
-                    <strong>Hi {{ current_user.username }}!</strong>
-                    <p class="friendly-note">Pick a ready computer below and tap the big button to reserve time. If the card is red, the computer is busy. If it is green, it is ready.</p>
-                </div>
-                <div class="nav-grid">
-                    <a href="/bookings" class="btn btn-big" style="border-color: #d91c39; color: #d91c39;">My Bookings</a>
-                    <a href="/logs" class="btn btn-big" style="border-color: #fff; color: #fff;">History</a>
-                    <a href="/logout" class="btn btn-big" style="border-color: #ff6b6b; color: #ff6b6b;">Logout</a>
-                </div>
-            {% endif %}
+                    {% else %}
+                        <p class="text-warn">Gateway scan: {{ gateway_scan.error }}</p>
+                    {% endif %}
+                {% endif %}
 
-            {% if current_user.is_admin %}
-            <div class="table-scroll">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Username</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for user in users %}
-                    <tr>
-                        <td style="font-weight:bold; color:white;">{{ user.username }}</td>
-                        <td>
-                            <a href="/force_stop_user/{{ user.id }}" class="btn btn-red" style="margin-top:0; padding:6px 10px;">Force Stop</a>
-                        </td>
-                    </tr>
+                <p class="section-label">Detected client IPs</p>
+                <div class="network-list compact">
+                    {% for ip in discovered_ips %}
+                        <div class="network-row"><span class="ip {{ 'assigned' if ip in assigned_ips else '' }}">{{ ip }}</span><strong>{{ 'Assigned' if ip in assigned_ips else 'Unassigned' }}</strong></div>
+                    {% else %}
+                        <p class="empty">No LAN IPs have been discovered.</p>
                     {% endfor %}
-                </tbody>
-            </table>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>Agent status</h2>
+                <p class="muted">Online stations are treated as in use. Offline means no recent agent heartbeat.</p>
+                <div class="agent-list">
+                    {% for row in agent_status %}
+                    <div class="agent-row">
+                        <span class="agent-name">{{ row.pc_name }}{% if row.lan_ip %} <small>{{ row.lan_ip }}</small>{% endif %}</span>
+                        <span class="badge {{ 'status-ok' if row.online else 'status-neutral' }}">{{ 'Online' if row.online else 'Offline' }}</span>
+                        <span class="muted">{{ row.seen_text }}</span>
+                        <span class="{{ 'queue-warn' if row.queue_count else 'muted' }}">Queue {{ row.queue_count }}</span>
+                    </div>
+                    {% else %}
+                        <p class="empty">No agent status data yet.</p>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>User controls</h2>
+                <p class="muted">Force stop ends a user's active session on every station.</p>
+                <div class="table-scroll">
+                    <table>
+                        <thead><tr><th>Username</th><th>Action</th></tr></thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td><strong>{{ user.username }}</strong></td>
+                                <td><a class="btn btn-secondary" href="/force_stop_user/{{ user.id }}">Force stop</a></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="2">No user accounts found.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </section>
+        {% else %}
+        <section class="panel">
+            <div class="panel-heading">
+                <div>
+                    <h2>Welcome, {{ current_user.username }}</h2>
+                    <p class="muted">This view shows live computer availability. Amber cards are in use; green cards are ready.</p>
+                </div>
             </div>
-            {% endif %}
-        </div>
+            <div class="inline">
+                <a class="btn" href="{{ url_for('profile.profile_page') }}">Open profile</a>
+                <a class="btn btn-secondary" href="{{ url_for('logout') }}">Log out</a>
+            </div>
+        </section>
+        {% endif %}
+    </main>
 
-    </div>
-
-<script src="{{ url_for('static', filename='js/index.js') }}" defer></script></body>
+    <script src="{{ url_for('static', filename='js/index.js') }}" defer></script>
+</body>
 </html>
-

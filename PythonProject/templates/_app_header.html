@@ -1,0 +1,25 @@
+{# Single workspace header shared by every signed-in page. Pages may set
+   header_title, header_subtitle, header_role and header_actions (a list of
+   {label, url, icon}) before including this file; everything else is fixed so
+   the top chrome matches on every page. #}
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="app-header-heading">
+      <a class="app-header-brand" href="{{ url_for('role_dashboard') }}">TechPulse</a>
+      <div class="app-header-titles">
+        <h1 class="app-header-title">{{ header_title or 'Dashboard' }}</h1>
+        {% if header_subtitle %}<p class="app-header-sub">{{ header_subtitle }}</p>{% endif %}
+      </div>
+    </div>
+    <div class="app-header-actions">
+      {% for action in header_actions or [] %}
+        <a class="header-action-button" href="{{ action.url }}">{% if action.icon %}<i class="{{ action.icon }}" aria-hidden="true"></i>{% endif %}{{ action.label }}</a>
+      {% endfor %}
+      <span class="app-header-user">{{ current_user.full_name or current_user.username }} · {{ header_role or current_user.role|replace('_', ' ')|title }}</span>
+      <a class="profile-avatar-link" href="{{ url_for('profile.profile_page') }}" aria-label="Open profile" title="Open profile">
+        {% if current_user.profile_picture %}<img src="{{ url_for('profile.profile_picture', v=profile_picture_version) }}" alt="">{% else %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4.25 4.25 0 1 0 0-8.5A4.25 4.25 0 0 0 12 12Zm0 2c-4.42 0-8 2.24-8 5v1.5h16V19c0-2.76-3.58-5-8-5Z"/></svg>{% endif %}
+      </a>
+      <a class="header-action-button" href="{{ url_for('logout') }}">Log out</a>
+    </div>
+  </div>
+</header>

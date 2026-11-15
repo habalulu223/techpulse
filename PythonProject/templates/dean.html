@@ -10,24 +10,9 @@
 </head>
 <body>
   {% include '_dashboard_nav.html' %}
-  <header>
-    <div>
-      <h1>Dean PC Monitoring</h1>
-      <span class="muted">Remote actions are delivered only to registered campus LAN agents.</span>
-    </div>
-    <div class="dean-head-actions">
-      <a class="header-action-button" href="{{ url_for('role_dashboard') }}">Dashboard</a>
-      <span>{{ current_user.username }} · {{ current_user.role|replace('_', ' ')|title }}</span>
-      <a class="profile-avatar-link" href="{{ url_for('profile.profile_page') }}" aria-label="Open profile" title="Open profile">
-        {% if current_user.profile_picture %}
-          <img src="{{ url_for('profile.profile_picture', v=profile_picture_version) }}" alt="">
-        {% else %}
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4.25 4.25 0 1 0 0-8.5A4.25 4.25 0 0 0 12 12Zm0 2c-4.42 0-8 2.24-8 5v1.5h16V19c0-2.76-3.58-5-8-5Z"/></svg>
-        {% endif %}
-      </a>
-      <a class="header-action-button" href="{{ url_for('logout') }}">Log out</a>
-    </div>
-  </header>
+  {% set header_title = 'Dean PC Monitoring' %}
+  {% set header_subtitle = 'Remote actions are delivered only to registered campus LAN agents.' %}
+  {% include '_app_header.html' %}
   <main>
     {% with messages = get_flashed_messages() %}
       {% for message in messages %}<p class="flash">{{ message }}</p>{% endfor %}

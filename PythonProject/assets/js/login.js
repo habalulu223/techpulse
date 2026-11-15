@@ -1,10 +1,6 @@
         var passwordInput = document.getElementById('password');
         var togglePasswordButton = document.getElementById('toggle-password');
         if (passwordInput && togglePasswordButton) {
-            function syncEyeVisibility() {
-                togglePasswordButton.classList.toggle('is-visible', passwordInput.value.length > 0);
-            }
-            passwordInput.addEventListener('input', syncEyeVisibility);
             togglePasswordButton.addEventListener('click', function() {
                 var show = passwordInput.type === 'password';
                 passwordInput.type = show ? 'text' : 'password';
@@ -13,7 +9,6 @@
                 togglePasswordButton.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
                 togglePasswordButton.setAttribute('title', show ? 'Hide password' : 'Show password');
             });
-            syncEyeVisibility();
         }
 
         document.addEventListener('startupSequenceComplete', function() {

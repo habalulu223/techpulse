@@ -19,7 +19,6 @@ import shutil
 import subprocess
 import uuid
 import zipfile
-from decimal import Decimal, InvalidOperation
 from urllib import request as http_request
 from urllib import error as http_error
 from urllib import parse as http_parse
@@ -158,10 +157,7 @@ def track_execution_time(f):
         return result
     return decorated_function
 
-HOURLY_RATE = 15.0
-BOOKING_LEAD_MINUTES = 30
 ALLOWED_LAN_COMMANDS = {"lock", "restart", "shutdown", "wake"}
-MAX_TOPUP_AMOUNT = 10000.0
 APP_VERSION = os.getenv("PYPONDO_APP_VERSION", "1.0.0").strip() or "1.0.0"
 # Google sign-in (OAuth 2.0 authorization code flow). Both values come from the
 # Google Cloud Console credentials page; when they are missing the login page
@@ -173,15 +169,7 @@ GOOGLE_AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
 GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 GOOGLE_USERINFO_ENDPOINT = 'https://openidconnect.googleapis.com/v1/userinfo'
 google_oauth_enabled = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
-TOPUP_CURRENCY = os.getenv("TOPUP_CURRENCY", "php").strip().lower() or "php"
-PAYMONGO_PUBLIC_KEY = os.getenv("PAYMONGO_PUBLIC_KEY", "pk_test_hRN7jf1RAviu9fXsis5mLU8y").strip()
-ALLOWED_TOPUP_METHODS = {
-    "gcash": "GCash",
-    "card": "Card",
-    "cash": "Cash"
-}
 DEFAULT_LAN_AGENT_TOKEN = "pypondo-lan-token-change-me"
-BILLING_DISABLED = str(os.getenv("PYPONDO_DISABLE_BILLING", "0")).strip().lower() in {"1", "true", "yes"}
 LAN_SCAN_CACHE = {"timestamp": 0, "cidr": None, "result": None, "scan_in_progress": False}
 LAN_SCAN_LOCK = threading.Lock()
 NETWORK_CMD_CACHE = {}
@@ -203,9 +191,6 @@ PUBLIC_TUNNEL_STATE = {
 # Global tracking for ping processes to prevent orphaned pings on exit
 ACTIVE_PING_PROCESSES = set()
 PING_LOCK = threading.Lock()
-
-# Auto-charge settings
-AUTO_CHARGE_ENABLED = True  # Default to enabled for backward compatibility
 
 def terminate_all_ping_processes():
     """Kill all active ping processes on exit to prevent spam."""
@@ -425,8 +410,7 @@ class AuthUser(db.Model):
 
     ``id`` mirrors the id of the corresponding :class:`User` row in the cafe
     database. Password hashes, emails, and Google identities are only ever
-    read/written here; the cafe database keeps business data (role, balance,
-    sessions, bookings).
+    read/written here; the cafe database keeps business data (role, sessions).
     """
     __bind_key__ = 'auth'
     __tablename__ = 'auth_users'
@@ -446,7 +430,6 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(120), nullable=False)
-    pondo = db.Column(db.Float, default=0.0)
     is_admin = db.Column(db.Boolean, default=False)
     # Staff roles remain separate from the legacy cafe administrator.
     role = db.Column(db.String(32), nullable=False, default="student")
@@ -454,6 +437,11 @@ class User(UserMixin, db.Model):
     is_active_staff = db.Column(db.Boolean, nullable=False, default=True)
     profile_picture = db.Column(db.LargeBinary, nullable=True)
     profile_picture_mime = db.Column(db.String(32), nullable=True)
+    cover_picture = db.Column(db.LargeBinary, nullable=True)
+    cover_picture_mime = db.Column(db.String(32), nullable=True)
+    theme = db.Column(db.String(16), nullable=False, default="light")
+    font_family = db.Column(db.String(24), nullable=False, default="inter")
+    font_size = db.Column(db.String(16), nullable=False, default="default")
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -649,25 +637,12 @@ class PC(db.Model):
     room = db.Column(db.String(80), nullable=True)
 
 
-class Booking(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    pc_id = db.Column(db.Integer, db.ForeignKey('pc.id'), nullable=False)
-    booking_date = db.Column(db.String(20), nullable=True)
-    time_slot = db.Column(db.String(20), nullable=False)
-    # Relationships for easy access in templates
-    user = db.relationship('User', backref='bookings')
-    pc = db.relationship('PC', backref='bookings')
-
-
 class Session(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     pc_id = db.Column(db.Integer, db.ForeignKey('pc.id'))
     start_time = db.Column(db.DateTime, default=datetime.now)
     end_time = db.Column(db.DateTime, nullable=True)
-    cost = db.Column(db.Float, default=0.0)
-    last_charged_at = db.Column(db.DateTime, nullable=True)
 
 
 class AdminLog(db.Model):
@@ -678,7 +653,7 @@ class AdminLog(db.Model):
 
 
 # Community equipment ERD. Kept alongside the cafe tables because
-# the application also stores bookings, PC sessions, and payments.
+# the application also stores PC sessions.
 class CommunityRole(db.Model):
     __bind_key__ = 'community'
     __tablename__ = 'roles'
@@ -926,18 +901,6 @@ class CommunityMaintenanceSchedule(db.Model):
     assignee = db.relationship('CommunityUser')
 
 
-class PaymentTransaction(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    provider = db.Column(db.String(32), nullable=False, default="online_request")
-    external_id = db.Column(db.String(128), unique=True, nullable=False)
-    amount = db.Column(db.Float, nullable=False)
-    currency = db.Column(db.String(8), nullable=False, default="php")
-    status = db.Column(db.String(32), nullable=False, default="pending")
-    created_at = db.Column(db.DateTime, default=datetime.now)
-    credited_at = db.Column(db.DateTime, nullable=True)
-
-
 class LanCommand(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     pc_name = db.Column(db.String(64), nullable=False, index=True)
@@ -979,28 +942,6 @@ def ensure_pc_lan_ip_column():
         db.session.commit()
 
 
-def ensure_booking_date_column():
-    try:
-        cols = [row[1] for row in db.session.execute(text("PRAGMA table_info(booking)")).fetchall()]
-    except Exception:
-        db.create_all()
-        cols = [row[1] for row in db.session.execute(text("PRAGMA table_info(booking)")).fetchall()]
-    if "booking_date" not in cols:
-        db.session.execute(text("ALTER TABLE booking ADD COLUMN booking_date VARCHAR(20)"))
-        db.session.commit()
-
-
-def ensure_session_last_charged_at_column():
-    try:
-        cols = [row[1] for row in db.session.execute(text("PRAGMA table_info(session)")).fetchall()]
-    except Exception:
-        db.create_all()
-        cols = [row[1] for row in db.session.execute(text("PRAGMA table_info(session)")).fetchall()]
-    if "last_charged_at" not in cols:
-        db.session.execute(text("ALTER TABLE session ADD COLUMN last_charged_at DATETIME"))
-        db.session.commit()
-
-
 def ensure_equipment_transaction_columns():
     cols = [row[1] for row in db.session.execute(text("PRAGMA table_info(equipment_transaction)")).fetchall()]
     if "return_requested_at" not in cols:
@@ -1010,11 +951,29 @@ def ensure_equipment_transaction_columns():
     db.session.commit()
 
 
+def remove_legacy_payment_schema():
+    """Drop the retired wallet/payment storage from existing installations."""
+    user_cols = [row[1] for row in db.session.execute(text("PRAGMA table_info(user)")).fetchall()]
+    if "pondo" in user_cols:
+        db.session.execute(text("ALTER TABLE user DROP COLUMN pondo"))
+    session_cols = [row[1] for row in db.session.execute(text("PRAGMA table_info(session)")).fetchall()]
+    if "cost" in session_cols:
+        db.session.execute(text("ALTER TABLE session DROP COLUMN cost"))
+    if "last_charged_at" in session_cols:
+        db.session.execute(text("ALTER TABLE session DROP COLUMN last_charged_at"))
+    db.session.execute(text("DROP TABLE IF EXISTS payment_transaction"))
+    db.session.commit()
+
+
+def remove_legacy_booking_schema():
+    """Drop the retired PC booking storage from existing installations."""
+    db.session.execute(text("DROP TABLE IF EXISTS booking"))
+    db.session.commit()
+
+
 def ensure_user_role_columns():
     """Small SQLite migration for installations created before staff roles existed."""
     cols = [row[1] for row in db.session.execute(text("PRAGMA table_info(user)")).fetchall()]
-    if "pondo" not in cols:
-        db.session.execute(text("ALTER TABLE user ADD COLUMN pondo FLOAT DEFAULT 0.0"))
     if "is_admin" not in cols:
         db.session.execute(text("ALTER TABLE user ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
     if "password_hash" not in cols:
@@ -1029,6 +988,16 @@ def ensure_user_role_columns():
         db.session.execute(text("ALTER TABLE user ADD COLUMN profile_picture BLOB"))
     if "profile_picture_mime" not in cols:
         db.session.execute(text("ALTER TABLE user ADD COLUMN profile_picture_mime VARCHAR(32)"))
+    if "cover_picture" not in cols:
+        db.session.execute(text("ALTER TABLE user ADD COLUMN cover_picture BLOB"))
+    if "cover_picture_mime" not in cols:
+        db.session.execute(text("ALTER TABLE user ADD COLUMN cover_picture_mime VARCHAR(32)"))
+    if "theme" not in cols:
+        db.session.execute(text("ALTER TABLE user ADD COLUMN theme VARCHAR(16) NOT NULL DEFAULT 'light'"))
+    if "font_family" not in cols:
+        db.session.execute(text("ALTER TABLE user ADD COLUMN font_family VARCHAR(24) NOT NULL DEFAULT 'inter'"))
+    if "font_size" not in cols:
+        db.session.execute(text("ALTER TABLE user ADD COLUMN font_size VARCHAR(16) NOT NULL DEFAULT 'default'"))
     db.session.execute(text("UPDATE user SET is_admin = 1 WHERE username = 'admin' AND is_admin = 0"))
     db.session.execute(text("UPDATE user SET role = 'administrator' WHERE is_admin = 1 AND (role IS NULL OR role = 'student')"))
     # Very old databases had user accounts without password hashes. Give these
@@ -1490,10 +1459,10 @@ def initialize_database():
             connection.exec_driver_sql('ALTER TABLE equipment ADD COLUMN owner_user_id INTEGER REFERENCES users(user_id)')
         connection.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_equipment_owner_user_id ON equipment (owner_user_id)')
     ensure_pc_lan_ip_column()
-    ensure_booking_date_column()
-    ensure_session_last_charged_at_column()
     ensure_equipment_transaction_columns()
     ensure_user_role_columns()
+    remove_legacy_payment_schema()
+    remove_legacy_booking_schema()
     merge_staff_roles_into_technician()
     ensure_core_seed_data()
     ensure_auth_database()
@@ -2335,44 +2304,7 @@ def format_duration_compact(total_seconds):
     return f"{seconds}s"
 
 
-def normalize_booking_date_value(raw_value):
-    raw_value = (raw_value or "").strip()
-    if not raw_value:
-        return datetime.now().strftime("%Y-%m-%d")
-    try:
-        return datetime.strptime(raw_value, "%Y-%m-%d").strftime("%Y-%m-%d")
-    except ValueError:
-        return None
-
-
-def normalize_time_slot_value(raw_value):
-    raw_value = (raw_value or "").strip()
-    if not raw_value:
-        return None
-    for time_format in ("%H:%M", "%H:%M:%S"):
-        try:
-            return datetime.strptime(raw_value, time_format).strftime("%H:%M")
-        except ValueError:
-            continue
-    return None
-
-
-def parse_booking_datetime(booking_date, time_slot):
-    try:
-        return datetime.strptime(f"{booking_date} {time_slot}", "%Y-%m-%d %H:%M")
-    except ValueError:
-        return None
-
-
-def find_conflicting_booking(pc_id, booking_date, time_slot):
-    same_day_bookings = Booking.query.filter_by(pc_id=pc_id, booking_date=booking_date).all()
-    for booking in same_day_bookings:
-        if normalize_time_slot_value(booking.time_slot) == time_slot:
-            return booking
-    return None
-
-
-def get_pc_booking_usage_state(pc, now_dt=None, online_window_seconds=None):
+def get_pc_usage_state(pc, now_dt=None, online_window_seconds=None):
     if now_dt is None:
         now_dt = datetime.now()
     if online_window_seconds is None:
@@ -2385,27 +2317,6 @@ def get_pc_booking_usage_state(pc, now_dt=None, online_window_seconds=None):
         "online_now": online_now,
         "in_use": bool(pc.is_occupied or active_session or online_now)
     }
-
-
-def annotate_booking_usage_for_pcs(pcs, now_dt=None):
-    if not pcs:
-        return pcs
-
-    if now_dt is None:
-        now_dt = datetime.now()
-
-    online_window_seconds = get_agent_online_window_seconds()
-    active_sessions = Session.query.filter_by(end_time=None).order_by(Session.start_time.desc()).all()
-    active_session_by_pc = {}
-    for session in active_sessions:
-        active_session_by_pc.setdefault(session.pc_id, session)
-
-    for pc in pcs:
-        active_session = active_session_by_pc.get(pc.id)
-        online_now = is_pc_online(pc, now_dt, online_window_seconds)
-        pc.booking_in_use_now = bool(pc.is_occupied or active_session or online_now)
-
-    return pcs
 
 
 def enqueue_lan_command(pc_name, command, payload=None, note=None):
@@ -2826,160 +2737,13 @@ def build_public_server_payload():
     }
 
 
-def charge_elapsed_for_session(session, now=None):
-    """Charge for elapsed time since last_charged_at (or start_time). Returns the charge amount."""
-    if now is None:
-        now = datetime.now()
-    if session.end_time is not None:
-        return 0.0
-    user = db.session.get(User, session.user_id)
-    if not user:
-        return 0.0
-
-    last_charged = session.last_charged_at or session.start_time
-    elapsed_seconds = (now - last_charged).total_seconds()
-    if elapsed_seconds < 1:  # minimum 1 second for live charging every 3 seconds
-        return 0.0
-
-    hours_played = elapsed_seconds / 3600.0
-    charge = round(hours_played * HOURLY_RATE, 2)
-    if charge > user.pondo:
-        charge = round(user.pondo, 2)
-    user.pondo -= charge
-    session.cost = (session.cost or 0.0) + charge
-    session.last_charged_at = now
-    return charge
-
 def finalize_session(session):
     if not session or session.end_time is not None:
-        return 0.0
-    now = datetime.now()
-    charge = charge_elapsed_for_session(session, now)
-    session.end_time = now
+        return
+    session.end_time = datetime.now()
     pc = db.session.get(PC, session.pc_id) if session.pc_id is not None else None
     if pc:
         pc.is_occupied = False
-    return charge
-
-
-def get_session_current_cost(session, now=None):
-    if not session:
-        return 0.0
-    if now is None:
-        now = datetime.now()
-
-    current_cost = float(session.cost or 0.0)
-    if session.end_time is not None:
-        return round(current_cost, 2)
-
-    last_charged = session.last_charged_at or session.start_time
-    if not last_charged:
-        return round(current_cost, 2)
-
-    elapsed_seconds = max((now - last_charged).total_seconds(), 0.0)
-    current_cost += (elapsed_seconds / 3600.0) * HOURLY_RATE
-    return round(current_cost, 2)
-
-
-def parse_topup_amount(raw):
-    try:
-        amount = Decimal(str(raw))
-    except (InvalidOperation, TypeError):
-        return None
-    if amount <= 0 or amount > Decimal(str(MAX_TOPUP_AMOUNT)):
-        return None
-    return float(amount.quantize(Decimal("0.01")))
-
-
-def create_payment_request(user, amount, source="web", provider="online_request", status="pending", external_id=None):
-    external_id = (external_id or "").strip() or f"REQ-{uuid.uuid4().hex[:16].upper()}"
-    tx = PaymentTransaction(
-        user_id=user.id,
-        provider=provider,
-        external_id=external_id,
-        amount=amount,
-        currency=TOPUP_CURRENCY,
-        status=status
-    )
-    db.session.add(tx)
-    db.session.add(AdminLog(
-        admin_name=user.username,
-        action=(
-            f"Payment request ({source}) created: {external_id}, provider={provider}, "
-            f"status={status}, amount={amount:.2f} {TOPUP_CURRENCY}"
-        )
-    ))
-    db.session.commit()
-    return tx
-
-
-def create_online_payment_request(user, amount, source="web"):
-    return create_payment_request(user, amount, source=source)
-
-
-def get_recent_payment_requests(user_id, limit=5):
-    try:
-        max_rows = max(1, int(limit))
-    except Exception:
-        max_rows = 5
-    return PaymentTransaction.query.filter_by(user_id=user_id).order_by(PaymentTransaction.created_at.desc()).limit(max_rows).all()
-
-
-def get_all_payment_requests(limit=200):
-    try:
-        max_rows = max(1, int(limit))
-    except Exception:
-        max_rows = 200
-    return PaymentTransaction.query.order_by(PaymentTransaction.created_at.desc()).limit(max_rows).all()
-
-
-def confirm_payment_transaction(tx, admin_user):
-    if not tx:
-        return False, "Payment transaction not found."
-    if tx.status == "paid":
-        return False, "Payment is already confirmed."
-    if tx.status == "cancelled":
-        return False, "Payment is cancelled and cannot be confirmed."
-
-    user = db.session.get(User, tx.user_id)
-    if not user:
-        return False, "User for this payment was not found."
-
-    user.pondo += float(tx.amount or 0.0)
-    tx.status = "paid"
-    tx.credited_at = datetime.now()
-    db.session.add(AdminLog(
-        admin_name=admin_user.username,
-        action=(
-            f"Confirmed payment {tx.external_id} for {user.username}, "
-            f"provider={tx.provider}, amount={tx.amount:.2f} {tx.currency}"
-        )
-    ))
-    db.session.commit()
-    return True, f"Confirmed payment {tx.external_id} for {user.username}."
-
-
-def redirect_for_current_user_page():
-    referrer = (request.referrer or "").strip().lower()
-
-    if current_user.is_admin:
-        return redirect(url_for('index'))
-
-    if "/client/bookings" in referrer:
-        return redirect(url_for('client_bookings'))
-    if "/client/desktop" in referrer:
-        return redirect(url_for('client_desktop'))
-
-    if user_has_positive_balance(current_user):
-        return redirect(url_for('client_desktop'))
-    return redirect(url_for('client_bookings'))
-
-
-def resolve_safe_return_to(raw_value):
-    target = str(raw_value or "").strip()
-    if target.startswith("/") and not target.startswith("//"):
-        return target
-    return None
 
 
 def get_latest_bundle_path(prefix):
@@ -3151,13 +2915,6 @@ def is_kiosk_mode_enabled():
     return str(os.getenv("PYPONDO_KIOSK_MODE", "0")).strip().lower() in {"1", "true", "yes"}
 
 
-def user_has_positive_balance(user):
-    try:
-        return float(getattr(user, "pondo", 0.0)) >= 1.0
-    except Exception:
-        return False
-
-
 def post_login_endpoint_for_user(user):
     if (getattr(user, "is_management", False)
             or getattr(user, "can_manage_equipment", False)
@@ -3246,28 +3003,6 @@ def get_mobile_equipment_user_from_token():
     return user, None
 
 
-def serialize_mobile_booking(booking, now_dt=None):
-    if now_dt is None:
-        now_dt = datetime.now()
-
-    booking_dt = parse_booking_datetime(
-        normalize_booking_date_value(booking.booking_date),
-        normalize_time_slot_value(booking.time_slot)
-    )
-    status = "confirmed"
-    if booking_dt and booking_dt < now_dt:
-        status = "expired"
-
-    return {
-        "id": booking.id,
-        "pc_id": booking.pc_id,
-        "pc_name": booking.pc.name if booking.pc else f"PC-{booking.pc_id}",
-        "date": booking.booking_date or now_dt.strftime("%Y-%m-%d"),
-        "time": normalize_time_slot_value(booking.time_slot) or booking.time_slot,
-        "status": status
-    }
-
-
 def get_mobile_updates_feed():
     newest_timestamp = None
     for relative_path in ("app.py", "desktop_app.py", "main.py"):
@@ -3287,7 +3022,7 @@ def get_mobile_updates_feed():
             "version": APP_VERSION,
             "update_type": "major",
             "title": "Techpuls core system ready",
-            "description": "Admin, desktop, and mobile booking flows are available from the same server.",
+            "description": "Admin, desktop, and mobile equipment flows are available from the same server.",
             "timestamp": timestamp
         },
         {
@@ -3311,52 +3046,23 @@ def build_mobile_assistant_response(user, message):
     text_value = str(message or "").strip()
     lowered = text_value.lower()
 
-    bookings = Booking.query.filter_by(user_id=user.id).order_by(Booking.booking_date.asc(), Booking.time_slot.asc()).all()
-    upcoming_booking = None
     now_dt = datetime.now()
-    for booking in bookings:
-        booking_dt = parse_booking_datetime(
-            normalize_booking_date_value(booking.booking_date),
-            normalize_time_slot_value(booking.time_slot)
-        )
-        if booking_dt and booking_dt >= now_dt:
-            upcoming_booking = booking
-            break
-
-    if any(term in lowered for term in ("balance", "pondo", "credit", "credits")):
-        return f"Your current balance is PHP {float(user.pondo or 0.0):.2f}."
-
-    if any(term in lowered for term in ("booking", "reservation", "book")):
-        if upcoming_booking:
-            return (
-                f"Your next booking is for {upcoming_booking.pc.name} on "
-                f"{upcoming_booking.booking_date} at {normalize_time_slot_value(upcoming_booking.time_slot) or upcoming_booking.time_slot}."
-            )
-        if bookings:
-            return f"You have {len(bookings)} booking record(s), but none are upcoming right now."
-        return "You do not have any bookings yet. Open the Bookings tab to reserve a PC."
 
     if any(term in lowered for term in ("pc", "pcs", "available", "computer")):
         pcs = PC.query.order_by(PC.id.asc()).all()
-        available_count = sum(1 for pc in pcs if not get_pc_booking_usage_state(pc, now_dt=now_dt)["in_use"])
+        available_count = sum(1 for pc in pcs if not get_pc_usage_state(pc, now_dt=now_dt)["in_use"])
         return f"There are {available_count} available PC(s) right now."
-
-    if any(term in lowered for term in ("top up", "topup", "payment", "gcash", "card", "cash")):
-        return "Use the Top Up tab to submit a request. Cash, GCash, and card requests are saved for admin confirmation."
 
     active_session = Session.query.filter_by(user_id=user.id, end_time=None).order_by(Session.start_time.desc()).first()
     if any(term in lowered for term in ("session", "playing", "time")):
         if active_session and active_session.start_time:
             elapsed = max((now_dt - active_session.start_time).total_seconds(), 0)
-            return (
-                f"Your session has been running for {format_duration_compact(elapsed)} "
-                f"and has cost PHP {float(active_session.cost or 0.0):.2f} so far."
-            )
+            return f"Your session has been running for {format_duration_compact(elapsed)}."
         return "You do not have an active session right now."
 
     return (
-        "I can help with your balance, bookings, available PCs, top-up requests, and session status. "
-        "Try asking about any of those."
+        "I can help with available PCs and session status. "
+        "Try asking about either of those."
     )
 
 
@@ -3670,23 +3376,8 @@ def api_mobile_login():
         "role": user.role or "student",
         "can_manage_equipment": bool(user.can_manage_equipment),
         "can_borrow_equipment": bool(user.can_borrow_equipment),
-        "balance": round(float(user.pondo or 0.0), 2),
         "access_token": create_mobile_api_token(user),
         "app_version": APP_VERSION
-    }), 200
-
-
-@app.route('/api/mobile/bookings', methods=['GET'])
-def api_mobile_bookings():
-    user, error = get_mobile_user_from_token()
-    if error:
-        return error
-
-    now_dt = datetime.now()
-    bookings = Booking.query.filter_by(user_id=user.id).order_by(Booking.booking_date.asc(), Booking.time_slot.asc()).all()
-    return jsonify({
-        "ok": True,
-        "bookings": [serialize_mobile_booking(booking, now_dt=now_dt) for booking in bookings]
     }), 200
 
 
@@ -3696,7 +3387,7 @@ def api_mobile_pcs():
     pcs = PC.query.order_by(PC.id.asc()).all()
     payload = []
     for pc in pcs:
-        usage_state = get_pc_booking_usage_state(pc, now_dt=now_dt)
+        usage_state = get_pc_usage_state(pc, now_dt=now_dt)
         payload.append({
             "id": pc.id,
             "name": pc.name,
@@ -3726,7 +3417,6 @@ def api_mobile_profile():
                 "username": user.username,
                 "full_name": user.full_name or user.username,
                 "role": user.role or "student",
-                "balance": round(float(user.pondo or 0.0), 2),
                 "has_profile_picture": bool(user.profile_picture and user.profile_picture_mime),
             }
         }), 200
@@ -3804,86 +3494,6 @@ def api_mobile_profile():
     return jsonify({"ok": False, "error": "Unsupported profile action."}), 400
 
 
-@app.route('/api/mobile/book', methods=['POST'])
-def api_mobile_book():
-    user, error = get_mobile_user_from_token()
-    if error:
-        return error
-
-    try:
-        pc_id = int(get_request_value("pc_id"))
-    except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "pc_id is required"}), 400
-
-    pc = db.session.get(PC, pc_id)
-    if not pc:
-        return jsonify({"ok": False, "error": "Selected PC was not found"}), 404
-
-    booking_date = normalize_booking_date_value(get_request_value("date") or get_request_value("booking_date"))
-    if not booking_date:
-        return jsonify({"ok": False, "error": "Invalid booking date"}), 400
-
-    time_slot = normalize_time_slot_value(get_request_value("time") or get_request_value("time_slot"))
-    if not time_slot:
-        return jsonify({"ok": False, "error": "Invalid booking time"}), 400
-
-    booking_dt = parse_booking_datetime(booking_date, time_slot)
-    if not booking_dt:
-        return jsonify({"ok": False, "error": "Invalid booking schedule"}), 400
-
-    now_dt = datetime.now()
-    lead_cutoff = now_dt + timedelta(minutes=BOOKING_LEAD_MINUTES)
-    usage_state = get_pc_booking_usage_state(pc, now_dt=now_dt)
-    if booking_dt < lead_cutoff:
-        if usage_state["in_use"]:
-            return jsonify({
-                "ok": False,
-                "error": f"{pc.name} is currently in use. Choose a time at least {BOOKING_LEAD_MINUTES} minutes from now."
-            }), 400
-        return jsonify({
-            "ok": False,
-            "error": f"Bookings must be scheduled at least {BOOKING_LEAD_MINUTES} minutes ahead."
-        }), 400
-
-    conflicting_booking = find_conflicting_booking(pc.id, booking_date, time_slot)
-    if conflicting_booking:
-        if conflicting_booking.user_id == user.id:
-            error_message = f"You already have a booking for {pc.name} on {booking_date} at {time_slot}."
-        else:
-            error_message = f"Another user already booked {pc.name} on {booking_date} at {time_slot}."
-        return jsonify({"ok": False, "error": error_message}), 409
-
-    new_booking = Booking(user_id=user.id, pc_id=pc.id, booking_date=booking_date, time_slot=time_slot)
-    db.session.add(new_booking)
-    db.session.commit()
-    return jsonify({
-        "ok": True,
-        "message": "Booking successful",
-        "booking": serialize_mobile_booking(new_booking, now_dt=now_dt)
-    }), 201
-
-
-@app.route('/api/mobile/topup', methods=['POST'])
-def api_mobile_topup():
-    user, error = get_mobile_user_from_token()
-    if error:
-        return error
-
-    amount = parse_topup_amount(get_request_value("amount"))
-    if amount is None:
-        return jsonify({"ok": False, "error": "Invalid top-up amount"}), 400
-
-    tx = create_online_payment_request(user, amount, source="mobile")
-    return jsonify({
-        "ok": True,
-        "message": f"Top-up request saved: {tx.external_id}. Waiting for admin confirmation.",
-        "payment_id": tx.id,
-        "external_id": tx.external_id,
-        "amount": round(float(tx.amount or 0.0), 2),
-        "balance": round(float(user.pondo or 0.0), 2)
-    }), 201
-
-
 @app.route('/api/mobile/ai-chat', methods=['POST'])
 def api_mobile_ai_chat():
     user, error = get_mobile_user_from_token()
@@ -3898,56 +3508,6 @@ def api_mobile_ai_chat():
         "ok": True,
         "response": build_mobile_assistant_response(user, message)
     }), 200
-
-
-@app.route('/api/charge-balance', methods=['POST'])
-@login_required
-def api_charge_balance():
-    if current_user.is_admin:
-        return jsonify(ok=False, message='Admins are not charged.'), 403
-    if not user_has_positive_balance(current_user):
-        return jsonify(ok=False, message='Insufficient balance.'), 402
-
-    active_session = Session.query.filter_by(user_id=current_user.id, end_time=None).order_by(Session.start_time.desc()).first()
-    if not active_session:
-        active_session = Session(user_id=current_user.id, last_charged_at=datetime.now())
-        db.session.add(active_session)
-        db.session.commit()
-        return jsonify(ok=True, charge=0.0, balance=current_user.pondo, message='Session started.')
-
-    charge = charge_elapsed_for_session(active_session, datetime.now())
-    db.session.commit()
-    return jsonify(ok=True, charge=charge, balance=current_user.pondo)
-
-
-@app.route('/api/session-status', methods=['GET'])
-@login_required
-def api_session_status():
-    if current_user.is_admin:
-        return jsonify(ok=False, message='Admins do not have sessions.'), 403
-
-    active_session = Session.query.filter_by(user_id=current_user.id, end_time=None).order_by(Session.start_time.desc()).first()
-
-    if not active_session:
-        return jsonify(ok=True, has_session=False, balance=current_user.pondo, cost=0.0, start_time=None)
-
-    # Calculate current cost
-    now = datetime.now()
-    if active_session.last_charged_at:
-        elapsed_seconds = (now - active_session.last_charged_at).total_seconds()
-        additional_cost = (elapsed_seconds / 3600.0) * HOURLY_RATE
-        current_cost = (active_session.cost or 0.0) + additional_cost
-    else:
-        current_cost = active_session.cost or 0.0
-
-    return jsonify(
-        ok=True,
-        has_session=True,
-        balance=current_user.pondo,
-        cost=round(current_cost, 2),
-        start_time=active_session.start_time.isoformat() if active_session.start_time else None,
-        last_charged_at=active_session.last_charged_at.isoformat() if active_session.last_charged_at else None
-    )
 
 
 @app.route('/favicon.ico')
@@ -3969,16 +3529,6 @@ def app_icon():
 def complete_login(user):
     """Sign a verified user in and route them to their dashboard."""
     login_user(user)
-    if not user.is_admin:
-        active_session = Session.query.filter_by(user_id=user.id, end_time=None).order_by(Session.start_time.desc()).first()
-        if active_session:
-            cost = finalize_session(active_session)
-            db.session.commit()
-            flash(f'Previous session ended. Cost: ₱{cost:.2f}.', 'info')
-        if user_has_positive_balance(user):
-            new_session = Session(user_id=user.id, last_charged_at=datetime.now())
-            db.session.add(new_session)
-            db.session.commit()
     safe_next = resolve_safe_next_url()
     if safe_next:
         return redirect(safe_next)
@@ -4005,9 +3555,8 @@ def login():
 def logout():
     active_session = Session.query.filter_by(user_id=current_user.id, end_time=None).order_by(Session.start_time.desc()).first()
     if active_session:
-        cost = finalize_session(active_session)
+        finalize_session(active_session)
         db.session.commit()
-        flash(f'Session ended. Cost: ₱{cost:.2f}.', 'info')
     logout_user()
     flash('Logged out.', 'info')
     return redirect(url_for('login'))
@@ -4134,7 +3683,7 @@ def auth_google_callback():
 @app.route('/client')
 @login_required
 def client_entry():
-    flash('PC-cafe booking has been retired. Use equipment borrowing instead.', 'info')
+    flash('The PC-cafe client has been retired. Use equipment borrowing instead.', 'info')
     return redirect(url_for(post_login_endpoint_for_user(current_user)))
 
 
@@ -4144,79 +3693,40 @@ def client_desktop():
     flash('PC-cafe sessions have been retired.', 'info')
     return redirect(url_for(post_login_endpoint_for_user(current_user)))
 
-    active_session = Session.query.filter_by(user_id=current_user.id, end_time=None).order_by(Session.start_time.desc()).first()
-    recent_payments = get_recent_payment_requests(current_user.id)
-    return render_template(
-        'client_desktop.html',
-        active_session=active_session,
-        recent_payments=recent_payments,
-        kiosk_mode=is_kiosk_mode_enabled(),
-        hourly_rate=HOURLY_RATE
-    )
 
-
-@app.route('/client/bookings')
-@login_required
-def client_bookings():
-    flash('PC-cafe bookings have been retired. Submit an equipment request instead.', 'info')
-    return redirect(url_for(post_login_endpoint_for_user(current_user)))
-
-    now_dt = datetime.now()
-    pcs = PC.query.order_by(PC.id.asc()).all()
-    annotate_booking_usage_for_pcs(pcs, now_dt=now_dt)
-    my_bookings = Booking.query.filter_by(user_id=current_user.id).order_by(Booking.id.desc()).all()
-    recent_payments = get_recent_payment_requests(current_user.id)
-    return render_template(
-        'client_bookings.html',
-        pcs=pcs,
-        bookings=my_bookings,
-        recent_payments=recent_payments,
-        today_date=now_dt.strftime("%Y-%m-%d"),
-        booking_lead_minutes=BOOKING_LEAD_MINUTES,
-        hourly_rate=HOURLY_RATE,
-        kiosk_mode=is_kiosk_mode_enabled()
-    )
-
-
-@app.route('/client/bookings/delete/<int:id>')
-@login_required
-def client_delete_booking(id):
-    flash('PC-cafe bookings have been retired.', 'info')
-    return redirect(url_for(post_login_endpoint_for_user(current_user)))
-
-    booking = Booking.query.filter_by(id=id, user_id=current_user.id).first()
-    if booking:
-        db.session.delete(booking)
-        db.session.commit()
-        flash('Booking removed.', 'info')
-    return redirect(url_for('client_bookings'))
+def landing_equipment_stats():
+    total = CommunityEquipment.query.count()
+    statuses = community_latest_equipment_statuses()
+    available = sum(status == 'Available' for status in statuses.values())
+    borrowed = sum(status == 'Borrowed' for status in statuses.values())
+    return {
+        'equipment_total': total,
+        'equipment_available': available,
+        'equipment_needs_attention': max(0, total - available - borrowed),
+        'equipment_reports': CommunityIssue.query.count(),
+    }
 
 
 @app.route('/landing')
 def landing():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-    return render_template('landing.html')
+    return render_template('landing.html', **landing_equipment_stats())
 
 
 @app.route('/')
 def index():
     if not current_user.is_authenticated:
-        return render_template('landing.html')
+        return render_template('landing.html', **landing_equipment_stats())
     if (getattr(current_user, 'is_management', False)
             or getattr(current_user, 'can_manage_equipment', False)
             or getattr(current_user, 'can_borrow_equipment', False)):
         return redirect(url_for('role_dashboard'))
-    if not current_user.is_admin:
-        if user_has_positive_balance(current_user):
-            return redirect(url_for('client_desktop'))
-        return redirect(url_for('client_bookings'))
 
     pcs = PC.query.all()
     android_apk_ready = is_android_apk_ready() if current_user.is_admin else False
     users = User.query.all() if current_user.is_admin else [current_user]
     active_sessions = Session.query.filter_by(end_time=None).order_by(Session.start_time.asc()).all()
-    recent_payments = get_recent_payment_requests(current_user.id)
     local_ips = get_local_lan_addresses() if current_user.is_admin else []
     mobile_pairing_targets = get_mobile_pairing_targets() if current_user.is_admin else []
     mobile_pairing_primary = mobile_pairing_targets[0] if mobile_pairing_targets else None
@@ -4259,7 +3769,6 @@ def index():
             active_session_user_by_id.get(active_session.user_id).username
             if active_session and active_session_user_by_id.get(active_session.user_id) else None
         )
-        pc.dashboard_session_current_cost = get_session_current_cost(active_session, now_dt) if active_session else None
         pc.dashboard_online = online_now
         pc.dashboard_in_use = effective_in_use
         pc.dashboard_usage_source = usage_source
@@ -4321,7 +3830,6 @@ def index():
         pc_status_chart=pc_status_chart,
         users=users,
         sessions=active_sessions,
-        recent_payments=recent_payments,
         local_ips=local_ips,
         mobile_pairing_targets=mobile_pairing_targets,
         mobile_pairing_primary=mobile_pairing_primary,
@@ -4332,17 +3840,13 @@ def index():
         assigned_ips=assigned_ips,
         agent_status=agent_status,
         android_apk_ready=android_apk_ready,
-        android_download_label="DOWNLOAD APK" if android_apk_ready else "DOWNLOAD BUILD KIT",
+        android_download_label="Download APK" if android_apk_ready else "Download build kit",
         android_download_note=(
             "Android APK is ready for direct download."
             if android_apk_ready else
             "APK is not built yet. This downloads the Android build kit with WSL/Linux build scripts."
         ),
-        combined_download_label="DOWNLOAD DESKTOP + PHONE" if android_apk_ready else "DOWNLOAD DESKTOP + ANDROID KIT",
-        today_date=datetime.now().strftime("%Y-%m-%d"),
-        booking_lead_minutes=BOOKING_LEAD_MINUTES,
-        hourly_rate=HOURLY_RATE,
-        auto_charge_enabled=AUTO_CHARGE_ENABLED
+        combined_download_label="Download desktop + phone" if android_apk_ready else "Download desktop + Android kit"
     )
 
 
@@ -4404,7 +3908,7 @@ def equipment_dashboard():
     ]
     if current_user.is_management:
         dashboard_tabs.insert(1, {'key': 'approvals', 'label': 'Borrowing approvals'})
-    if current_user.is_dean or current_user.is_admin:
+    if current_user.is_admin:
         dashboard_tabs.append({'key': 'users', 'label': 'User access'})
     allowed_views = {tab['key'] for tab in dashboard_tabs}
     dashboard_view = request.args.get('view', 'inventory')
@@ -4539,8 +4043,9 @@ def role_dashboard():
             {'title': 'Catalogs and settings', 'description': 'Manage equipment categories, locations, and status options.', 'url': url_for('equipment_dashboard', view='catalogs'), 'action': 'Open catalogs'},
             {'title': 'Equipment report', 'description': 'Download the current inventory summary.', 'url': url_for('download_equipment_report'), 'action': 'Download CSV'}
         ]
-        if current_user.is_dean or current_user.is_admin:
+        if current_user.is_admin:
             cards.append({'title': 'User access', 'description': 'Review staff and student roles and account status.', 'url': url_for('equipment_dashboard', view='users'), 'action': 'Manage access'})
+        if current_user.is_dean or current_user.is_admin:
             cards.append({'title': 'Campus PC monitoring', 'description': 'View registered PCs and available remote actions.', 'url': url_for('dean_dashboard'), 'action': 'Open PC monitor'})
             cards.append({'title': 'Dean Analytics', 'description': 'Review equipment borrowing records and laboratory activity.', 'url': url_for('dean_analytics'), 'action': 'View analytics'})
     elif role == 'instructor':
@@ -5717,26 +5222,6 @@ def download_pc_qr(pc_id):
     return send_file(output, mimetype='image/png', download_name=f'pc-{pc.id}-qr.png', max_age=300)
 
 
-@app.route('/bookings')
-@login_required
-def view_bookings():
-    if not current_user.is_admin: return redirect(url_for('index'))
-    bookings = Booking.query.all()
-    return render_template('bookings.html', bookings=bookings)
-
-
-@app.route('/delete_booking/<int:id>')
-@login_required
-def delete_booking(id):
-    if not current_user.is_admin: return redirect(url_for('index'))
-    booking = db.session.get(Booking, id)
-    if booking:
-        db.session.delete(booking)
-        db.session.commit()
-        flash('Booking cancelled/removed.', 'info')
-    return redirect(url_for('view_bookings'))
-
-
 @app.route('/logs')
 @login_required
 def view_logs():
@@ -5760,41 +5245,6 @@ def view_logs():
         entries.append({'timestamp': audit.created_at, 'admin_name': who, 'action': detail})
     entries.sort(key=lambda row: row['timestamp'] or datetime.min, reverse=True)
     return render_template('logs.html', logs=entries)
-
-
-@app.route('/admin/payments')
-@login_required
-def admin_payments():
-    if not current_user.is_admin:
-        return redirect(url_for('index'))
-
-    payments = get_all_payment_requests()
-    user_map = {
-        user.id: user.username
-        for user in User.query.filter(User.id.in_([tx.user_id for tx in payments])).all()
-    } if payments else {}
-
-    for tx in payments:
-        tx.display_username = user_map.get(tx.user_id, f"User #{tx.user_id}")
-
-    return render_template('payments.html', payments=payments)
-
-
-@app.route('/admin/payments/confirm', methods=['POST'])
-@login_required
-def admin_confirm_payment():
-    if not current_user.is_admin:
-        return redirect(url_for('index'))
-
-    tx_id = request.form.get('payment_id', type=int)
-    if not tx_id:
-        flash('Select a payment first.', 'error')
-        return redirect(url_for('admin_payments'))
-
-    tx = db.session.get(PaymentTransaction, tx_id)
-    ok, message = confirm_payment_transaction(tx, current_user)
-    flash(message, 'success' if ok else 'error')
-    return redirect(url_for('admin_payments'))
 
 
 @app.route('/admin/terminate-system', methods=['POST'])
@@ -5865,44 +5315,6 @@ def refresh_ips():
     db.session.commit()
 
     flash(f'IP refresh complete. Cleared {len(cleared)} offline/stale IP(s). Found {len(discovered_ipv4)} online IP(s) available for assignment.', 'info')
-    return redirect(url_for('index'))
-
-
-@app.route('/admin/auto_charge/enable')
-@login_required
-def enable_auto_charge():
-    if not current_user.is_admin:
-        return redirect(url_for('index'))
-
-    global AUTO_CHARGE_ENABLED
-    AUTO_CHARGE_ENABLED = True
-
-    db.session.add(AdminLog(
-        admin_name=current_user.username,
-        action="Enabled automatic charging for active sessions"
-    ))
-    db.session.commit()
-
-    flash('Automatic charging enabled. Users will now be charged automatically for active sessions.', 'success')
-    return redirect(url_for('index'))
-
-
-@app.route('/admin/auto_charge/disable')
-@login_required
-def disable_auto_charge():
-    if not current_user.is_admin:
-        return redirect(url_for('index'))
-
-    global AUTO_CHARGE_ENABLED
-    AUTO_CHARGE_ENABLED = False
-
-    db.session.add(AdminLog(
-        admin_name=current_user.username,
-        action="Disabled automatic charging for active sessions"
-    ))
-    db.session.commit()
-
-    flash('Automatic charging disabled. Users will not be charged automatically.', 'warning')
     return redirect(url_for('index'))
 
 
@@ -6044,235 +5456,6 @@ def admin_clear_pc_commands(pc_id):
     return redirect(url_for('index'))
 
 
-# --- SYSTEM FEATURES ---
-
-@app.route('/pondo', methods=['GET', 'POST'])
-@login_required
-def manage_pondo():
-    # allow admins to credit any account, regular users only their own
-    if request.method == 'POST':
-        if current_user.is_admin:
-            username = request.form.get('username', '').strip()
-            user = User.query.filter_by(username=username).first()
-            if not user:
-                flash('User not found.', 'error')
-                return redirect(url_for('manage_pondo'))
-        else:
-            user = current_user
-
-        try:
-            amount = float(request.form['amount'])
-        except Exception:
-            flash('Invalid amount.', 'error')
-            return redirect(url_for('manage_pondo'))
-
-        user.pondo += amount
-        if current_user.is_admin:
-            log = AdminLog(admin_name=current_user.username, action=f"Added ₱{amount} to '{user.username}'")
-            flash(f'Credits added to {user.username}!', 'success')
-        else:
-            log = AdminLog(admin_name=current_user.username, action=f"User {user.username} topped up ₱{amount}")
-            flash('Your balance has been updated.', 'success')
-
-        db.session.add(log)
-        db.session.commit()
-        return redirect(url_for('index'))
-
-    return render_template('pondo.html')
-
-
-@app.route('/book', methods=['POST'])
-@login_required
-def book_pc():
-    pc_id = request.form.get('pc_id', type=int)
-    if not pc_id:
-        flash('Select a PC first.', 'error')
-        return redirect_for_current_user_page()
-
-    pc = db.session.get(PC, pc_id)
-    if not pc:
-        flash('Selected PC was not found.', 'error')
-        return redirect_for_current_user_page()
-
-    booking_date = normalize_booking_date_value(request.form.get('booking_date'))
-    if not booking_date:
-        flash('Invalid booking date.', 'error')
-        return redirect_for_current_user_page()
-
-    time_slot = normalize_time_slot_value(request.form.get('time_slot'))
-    if not time_slot:
-        flash('Invalid booking time.', 'error')
-        return redirect_for_current_user_page()
-
-    booking_dt = parse_booking_datetime(booking_date, time_slot)
-    if not booking_dt:
-        flash('Invalid booking schedule.', 'error')
-        return redirect_for_current_user_page()
-
-    now_dt = datetime.now()
-    lead_cutoff = now_dt + timedelta(minutes=BOOKING_LEAD_MINUTES)
-    usage_state = get_pc_booking_usage_state(pc, now_dt=now_dt)
-
-    if booking_dt < lead_cutoff:
-        if usage_state["in_use"]:
-            flash(
-                f'{pc.name} is currently in use. Choose a booking time at least {BOOKING_LEAD_MINUTES} minutes from now.',
-                'error'
-            )
-        else:
-            flash(f'Bookings must be scheduled at least {BOOKING_LEAD_MINUTES} minutes ahead.', 'error')
-        return redirect_for_current_user_page()
-
-    conflicting_booking = find_conflicting_booking(pc.id, booking_date, time_slot)
-    if conflicting_booking:
-        conflict_owner = "You already have" if conflicting_booking.user_id == current_user.id else "Another user already has"
-        flash(
-            f'{conflict_owner} a booking for {pc.name} on {booking_date} at {time_slot}.',
-            'error'
-        )
-        return redirect_for_current_user_page()
-
-    new_booking = Booking(
-        user_id=current_user.id,
-        pc_id=pc.id,
-        booking_date=booking_date,
-        time_slot=time_slot
-    )
-    db.session.add(new_booking)
-    db.session.commit()
-    flash('Reservation confirmed!', 'success')
-    if current_user.is_admin:
-        return redirect(url_for('index'))
-    if user_has_positive_balance(current_user):
-        return redirect(url_for('client_desktop'))
-    return redirect(url_for('client_bookings'))
-
-
-@app.route('/topup', methods=['POST'])
-@login_required
-def topup():
-    amount_raw = request.form.get('amount', '').strip()
-    amount = parse_topup_amount(amount_raw)
-    if amount is None:
-        flash('Invalid amount.', 'error')
-        return redirect_for_current_user_page()
-
-    tx = create_online_payment_request(current_user, amount, source="web")
-    flash(f'Payment request saved: {tx.external_id}. Waiting for confirmation.', 'success')
-    return redirect_for_current_user_page()
-
-
-@app.route('/topup/online', methods=['POST'])
-@login_required
-def topup_online():
-    amount = parse_topup_amount(request.form.get('amount', '').strip())
-    if amount is None:
-        flash('Invalid top-up amount.', 'error')
-        return redirect_for_current_user_page()
-
-    return_to = resolve_safe_return_to(request.form.get('return_to')) or resolve_safe_return_to(request.referrer)
-    return render_template(
-        'payment.html',
-        amount=amount,
-        return_to=return_to,
-        paymongo_public_key=PAYMONGO_PUBLIC_KEY,
-        paymongo_ready=bool(PAYMONGO_PUBLIC_KEY),
-        topup_currency=TOPUP_CURRENCY.upper(),
-        payment_methods=ALLOWED_TOPUP_METHODS
-    )
-
-
-@app.route('/topup/complete', methods=['POST'])
-@login_required
-def topup_complete():
-    amount = parse_topup_amount(request.form.get('amount', '').strip())
-    if amount is None:
-        flash('Invalid top-up amount.', 'error')
-        return redirect_for_current_user_page()
-
-    method = str(request.form.get('method', '')).strip().lower()
-    if method not in ALLOWED_TOPUP_METHODS:
-        flash('Invalid payment method.', 'error')
-        return redirect_for_current_user_page()
-
-    return_to = resolve_safe_return_to(request.form.get('return_to'))
-    payment_method_id = str(request.form.get('payment_method_id', '')).strip()
-    payment_reference = str(request.form.get('payment_reference', '')).strip()
-
-    if method == "cash":
-        tx = create_payment_request(
-            current_user,
-            amount,
-            source="cash_checkout",
-            provider="cash",
-            status="awaiting_cash",
-            external_id=f"CASH-{uuid.uuid4().hex[:16].upper()}"
-        )
-        flash(f'Cash top-up request saved: {tx.external_id}. Please pay at the counter.', 'success')
-    else:
-        external_id = payment_method_id or payment_reference or f"{method.upper()}-{uuid.uuid4().hex[:16].upper()}"
-        tx = create_payment_request(
-            current_user,
-            amount,
-            source=f"paymongo_{method}",
-            provider=f"paymongo_{method}",
-            status="pending_confirmation",
-            external_id=external_id
-        )
-        flash(
-            f'{ALLOWED_TOPUP_METHODS[method]} top-up request saved: {tx.external_id}. '
-            f'Payment is waiting for confirmation.',
-            'success'
-        )
-
-    if return_to:
-        return redirect(return_to)
-    return redirect_for_current_user_page()
-
-
-@app.route('/payment/success')
-@login_required
-def payment_success():
-    flash('Online payment request is recorded directly in database.', 'info')
-    return redirect(url_for('index'))
-
-
-@app.route('/payment/cancel')
-@login_required
-def payment_cancel():
-    flash('Payment cancelled.', 'info')
-    return redirect(url_for('index'))
-
-
-@app.route('/client/payments/cancel/<int:payment_id>', methods=['POST'])
-@login_required
-def client_cancel_payment(payment_id):
-    tx = PaymentTransaction.query.filter_by(id=payment_id, user_id=current_user.id).first()
-    if not tx:
-        flash('Payment request not found.', 'error')
-        return redirect_for_current_user_page()
-
-    if tx.status == 'paid':
-        flash('Confirmed payments cannot be cancelled.', 'error')
-        return redirect_for_current_user_page()
-
-    if tx.status == 'cancelled':
-        flash('Payment request is already cancelled.', 'info')
-        return redirect_for_current_user_page()
-
-    tx.status = 'cancelled'
-    db.session.add(AdminLog(
-        admin_name=current_user.username,
-        action=(
-            f"Cancelled own payment request {tx.external_id}, "
-            f"provider={tx.provider}, amount={tx.amount:.2f} {tx.currency}"
-        )
-    ))
-    db.session.commit()
-    flash(f'Payment request {tx.external_id} cancelled.', 'success')
-    return redirect_for_current_user_page()
-
-
 @app.route('/pc_command', methods=['POST'])
 @login_required
 def pc_command():
@@ -6343,48 +5526,6 @@ def api_pc_command():
     return jsonify({"ok": True, "message": message, "pc_name": pc_name, "command": command}), 200
 
 
-@app.route('/api/topup', methods=['POST'])
-@login_required
-def api_topup():
-    data = request.get_json(silent=True) or {}
-    amount = parse_topup_amount(data.get('amount', 0))
-    if amount is None:
-        return jsonify({"ok": False, "error": "invalid amount"}), 400
-
-    tx = create_online_payment_request(current_user, amount, source="api")
-
-    return jsonify({
-        "ok": True,
-        "message": "Payment request saved",
-        "amount": amount,
-        "transaction_id": tx.external_id,
-        "status": tx.status,
-        "username": current_user.username
-    }), 200
-
-
-@app.route('/api/topup/confirm', methods=['POST'])
-@login_required
-def api_topup_confirm():
-    data = request.get_json(silent=True) or {}
-    transaction_id = str(data.get("transaction_id", "")).strip()
-    if not transaction_id:
-        return jsonify({"ok": False, "error": "transaction_id is required"}), 400
-
-    tx = PaymentTransaction.query.filter_by(external_id=transaction_id, user_id=current_user.id).first()
-    if not tx:
-        return jsonify({"ok": False, "error": "transaction not found"}), 404
-
-    return jsonify({
-        "ok": True,
-        "message": "Transaction status loaded",
-        "transaction_id": tx.external_id,
-        "status": tx.status,
-        "amount": tx.amount,
-        "currency": tx.currency
-    }), 200
-
-
 @app.route('/start_session/<int:pc_id>/<int:user_id>')
 @login_required
 def start_session(pc_id, user_id):
@@ -6394,9 +5535,6 @@ def start_session(pc_id, user_id):
     if not user or not pc:
         flash('Invalid user or PC.', 'error')
         return redirect(url_for('index'))
-    if user.pondo <= 0:
-        flash('Insufficient Pondo!', 'error')
-        return redirect(url_for('index'))
     existing_active = Session.query.filter_by(user_id=user.id, end_time=None).first()
     if existing_active:
         flash('User already has an active session.', 'error')
@@ -6405,7 +5543,6 @@ def start_session(pc_id, user_id):
         flash('PC is already occupied.', 'error')
         return redirect(url_for('index'))
     new_session = Session(user_id=user.id, pc_id=pc.id)
-    new_session.last_charged_at = datetime.now()
     db.session.add(new_session)
     pc.is_occupied = True
     db.session.add(AdminLog(admin_name=current_user.username, action=f"Started session for {user.username} on {pc.name}"))
@@ -6420,10 +5557,10 @@ def end_session(session_id):
     if not current_user.is_admin: return redirect(url_for('index'))
     session = db.session.get(Session, session_id)
     if not session: return redirect(url_for('index'))
-    cost = finalize_session(session)
-    db.session.add(AdminLog(admin_name=current_user.username, action=f"Ended session #{session.id}. Cost: {cost:.2f}"))
+    finalize_session(session)
+    db.session.add(AdminLog(admin_name=current_user.username, action=f"Ended session #{session.id}"))
     db.session.commit()
-    flash(f'Session Ended. Cost: ₱{cost}.', 'info')
+    flash('Session ended.', 'info')
     return redirect(url_for('index'))
 
 
@@ -6443,16 +5580,15 @@ def force_stop_user(user_id):
         flash(f'No active session for {user.username}.', 'info')
         return redirect(url_for('index'))
 
-    total_cost = 0.0
     for session in active_sessions:
-        total_cost += finalize_session(session)
+        finalize_session(session)
 
     db.session.add(AdminLog(
         admin_name=current_user.username,
-        action=f"Force-stopped {len(active_sessions)} active session(s) for {user.username}. Total cost: {total_cost:.2f}"
+        action=f"Force-stopped {len(active_sessions)} active session(s) for {user.username}"
     ))
     db.session.commit()
-    flash(f'Force-stopped {user.username}. Total cost: {total_cost:.2f}', 'success')
+    flash(f'Force-stopped {user.username}.', 'success')
     return redirect(url_for('index'))
 
 
@@ -6484,13 +5620,12 @@ def api_force_stop_user():
     if not active_sessions:
         return jsonify({"ok": True, "message": "No active sessions", "stopped_sessions": 0, "username": user.username}), 200
 
-    total_cost = 0.0
     for session in active_sessions:
-        total_cost += finalize_session(session)
+        finalize_session(session)
 
     db.session.add(AdminLog(
         admin_name=current_user.username,
-        action=f"API force-stopped {len(active_sessions)} active session(s) for {user.username}. Total cost: {total_cost:.2f}"
+        action=f"API force-stopped {len(active_sessions)} active session(s) for {user.username}"
     ))
     db.session.commit()
 
@@ -6498,38 +5633,8 @@ def api_force_stop_user():
         "ok": True,
         "message": "User force-stopped",
         "username": user.username,
-        "stopped_sessions": len(active_sessions),
-        "total_cost": round(total_cost, 2),
-        "new_balance": round(user.pondo, 2)
+        "stopped_sessions": len(active_sessions)
     }), 200
-
-
-@app.route('/api/admin/pondo', methods=['POST'])
-@login_required
-def api_admin_pondo():
-    if not current_user.is_admin:
-        return jsonify({"ok": False, "error": "admin-only endpoint"}), 403
-
-    data = request.get_json(silent=True) or {}
-    username = str(data.get("username", "")).strip()
-    try:
-        amount = float(data.get("amount", 0))
-    except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "amount must be a number"}), 400
-
-    if not username:
-        return jsonify({"ok": False, "error": "username is required"}), 400
-    if amount <= 0:
-        return jsonify({"ok": False, "error": "amount must be greater than 0"}), 400
-
-    user = User.query.filter_by(username=username).first()
-    if not user:
-        return jsonify({"ok": False, "error": "user not found"}), 404
-
-    user.pondo += amount
-    db.session.add(AdminLog(admin_name=current_user.username, action=f"API added {amount:.2f} credits to {username}"))
-    db.session.commit()
-    return jsonify({"ok": True, "username": username, "amount": amount, "new_balance": round(user.pondo, 2)}), 200
 
 
 @app.route('/api/admin/lan-discovery', methods=['GET'])
@@ -6773,44 +5878,6 @@ def api_agent_ack_command():
     ))
     db.session.commit()
     return jsonify({"ok": True, "command_id": cmd.id, "status": cmd.status}), 200
-
-
-# --- Periodic Billing ---
-_billing_thread_started = False
-
-def start_periodic_billing():
-    global _billing_thread_started
-    if _billing_thread_started or BILLING_DISABLED:
-        return
-    _billing_thread_started = True
-
-    def billing_loop():
-        with app.app_context():
-            while True:
-                time.sleep(3)  # Live charging every 3 seconds
-                if not AUTO_CHARGE_ENABLED:
-                    continue
-                try:
-                    now = datetime.now()
-                    active_sessions = Session.query.filter_by(end_time=None).all()
-                    for sess in active_sessions:
-                        try:
-                            charge = charge_elapsed_for_session(sess, now)
-                            if charge > 0:
-                                db.session.commit()
-                            else:
-                                db.session.rollback()
-                        except Exception:
-                            db.session.rollback()
-                except Exception as e:
-                    print(f"Billing task error: {e}")
-
-    t = threading.Thread(target=billing_loop, daemon=True)
-    t.start()
-
-@app.before_request
-def ensure_billing_started():
-    start_periodic_billing()
 
 
 if __name__ == '__main__':

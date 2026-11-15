@@ -21,16 +21,16 @@
 </div></header>
 <main>
 <section class="hero" id="home"><div class="container hero-grid"><div>
-<div class="eyebrow"><span class="pulse"></span> IT Department Equipment Management</div>
+<div class="eyebrow"><span class="pulse"></span> Equipment Management</div>
 <h1>Smarter equipment care starts with <span class="gradient-text">TechPulse.</span></h1>
 <p class="hero-copy">Monitor equipment, report issues, manage borrowing, and keep maintenance organized—all in one centralized system for the IT Department.</p>
 <div class="hero-actions"><a class="btn btn-primary" href="{{ url_for('login') }}">Get Started →</a><a class="btn btn-outline" href="#features">Explore Features</a></div>
 <p class="hero-note">One system. Clear records. Better equipment management.</p>
 </div>
 <div class="visual-wrap"><div class="glow"></div><div class="preview">
-<div class="preview-head"><div class="preview-title">Equipment Overview</div><span class="live-tag">● System concept</span></div>
-<div class="stats"><div class="stat"><small>Total Equipment</small><strong>—</strong><em>Asset records</em></div><div class="stat"><small>Available</small><strong>—</strong><em>Ready to use</em></div><div class="stat"><small>For Maintenance</small><strong>—</strong><em>Needs attention</em></div><div class="stat"><small>Active Reports</small><strong>—</strong><em>For monitoring</em></div></div>
-<div class="activity"><strong> class="u-style-1"System workflow</strong><div class="activity-row"><span class="activity-icon">▦</span><span>Equipment identification</span><small>QR / ID</small></div><div class="activity-row"><span class="activity-icon">＋</span><span>Issue and damage report</span><small>Report</small></div><div class="activity-row"><span class="activity-icon">⚙</span><span>Maintenance tracking</span><small>Repair</small></div></div>
+<div class="preview-head"><div class="preview-title">Equipment Overview</div><span class="live-tag">● Live overview</span></div>
+<div class="stats"><div class="stat"><small>Total Equipment</small><strong>{{ equipment_total }}</strong><em>Asset records</em></div><div class="stat"><small>Available</small><strong>{{ equipment_available }}</strong><em>Ready to use</em></div><div class="stat"><small>For Maintenance</small><strong>{{ equipment_needs_attention }}</strong><em>Needs attention</em></div><div class="stat"><small>Active Reports</small><strong>{{ equipment_reports }}</strong><em>For monitoring</em></div></div>
+<div class="activity"><strong class="u-style-1">System workflow</strong><div class="activity-row"><span class="activity-icon">▦</span><span>Equipment identification</span><small>QR / ID</small></div><div class="activity-row"><span class="activity-icon">＋</span><span>Issue and damage report</span><small>Report</small></div><div class="activity-row"><span class="activity-icon">⚙</span><span>Maintenance tracking</span><small>Repair</small></div></div>
 </div></div></div></section>
 <section id="features"><div class="container"><div class="section-head"><div class="section-kicker">What TechPulse offers</div><h2>Everything organized in one place.</h2><p>Helpful tools for monitoring IT Department equipment from identification to maintenance.</p></div>
 <div class="features">
@@ -47,5 +47,5 @@
 <section id="about"><div class="container about-grid"><div><div class="section-kicker">About the system</div><h2>Built to support a more organized IT Department.</h2><p class="muted">TechPulse is designed to make equipment monitoring, issue reporting, borrowing, and maintenance management easier to follow.</p></div><div class="about-panel"><p><strong>Our goal</strong></p><p class="muted">To provide a centralized way to track IT Department equipment, improve reporting, and keep maintenance and borrowing records clear and accountable.</p><p class="u-style-2 muted">TechPulse — We keep equipment information within reach.</p></div></div></section>
 <section><div class="container"><div class="cta"><div class="section-kicker">Ready to get started?</div><h2>Keep your equipment in check.</h2><p>Sign in to access the TechPulse system and its available features.</p><a class="btn btn-primary" href="{{ url_for('login') }}">Sign In to TechPulse →</a></div></div></section>
 </main>
-<footer><div class="container footer-inner"><span>© 2026 TechPulse. IT Department Equipment Management System.</span><span>Organized equipment. Clear accountability.</span></div></footer>
+<footer><div class="container footer-inner"><span>© 2026 TechPulse. Equipment Management System.</span><span>Organized equipment. Clear accountability.</span></div></footer>
 <script src="{{ url_for('static', filename='js/landing.js') }}" defer></script></body></html>

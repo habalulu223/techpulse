@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings · TechPulse</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">{% include '_dashboard_container_theme.html' %}
+</head>
+<body>
+{% set header_title = 'Settings' %}
+{% set header_subtitle = 'Choose how TechPulse looks for your account.' %}
+{% include '_app_header.html' %}
+<main class="settings-main">
+<h1>Settings</h1>
+<p class="subtitle">Your appearance preferences are saved to your account and apply on every page.</p>
+{% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="flash {{ category }}" role="status">{{ message }}</div>{% endfor %}{% endwith %}
+
+<form method="post" class="settings-form">
+<section class="panel" aria-labelledby="theme-heading">
+<h2 id="theme-heading">Theme</h2>
+<p class="muted">Pick the surface and text colours for your workspace.</p>
+<div class="option-grid theme-options">
+<label class="option-tile">
+<input type="radio" name="theme" value="light"{% if preferences.theme == 'light' %} checked{% endif %}>
+<span class="theme-swatch theme-swatch-light" aria-hidden="true"></span>
+<span class="option-copy"><strong>Light</strong><small>Bright surfaces with deep ink text.</small></span>
+</label>
+<label class="option-tile">
+<input type="radio" name="theme" value="dark"{% if preferences.theme == 'dark' %} checked{% endif %}>
+<span class="theme-swatch theme-swatch-dark" aria-hidden="true"></span>
+<span class="option-copy"><strong>Dark</strong><small>Navy surfaces for low-light use.</small></span>
+</label>
+</div>
+</section>
+
+<section class="panel" aria-labelledby="font-heading">
+<h2 id="font-heading">Font</h2>
+<p class="muted">Choose the typeface and reading size used across the app.</p>
+<div class="option-grid font-options">
+<label class="option-tile">
+<input type="radio" name="font_family" value="inter"{% if preferences.font_family == 'inter' %} checked{% endif %}>
+<span class="option-copy option-preview font-inter"><strong>Inter</strong><small>The quick brown fox · 0123</small></span>
+</label>
+<label class="option-tile">
+<input type="radio" name="font_family" value="system"{% if preferences.font_family == 'system' %} checked{% endif %}>
+<span class="option-copy option-preview font-system"><strong>System</strong><small>The quick brown fox · 0123</small></span>
+</label>
+<label class="option-tile">
+<input type="radio" name="font_family" value="serif"{% if preferences.font_family == 'serif' %} checked{% endif %}>
+<span class="option-copy option-preview font-serif"><strong>Serif</strong><small>The quick brown fox · 0123</small></span>
+</label>
+</div>
+<h3 class="sub-heading">Text size</h3>
+<div class="option-grid size-options">
+<label class="option-tile option-tile-row">
+<input type="radio" name="font_size" value="compact"{% if preferences.font_size == 'compact' %} checked{% endif %}>
+<span class="option-copy"><strong>Compact</strong><small>Fits more on screen.</small></span>
+</label>
+<label class="option-tile option-tile-row">
+<input type="radio" name="font_size" value="default"{% if preferences.font_size == 'default' %} checked{% endif %}>
+<span class="option-copy"><strong>Default</strong><small>Balanced reading size.</small></span>
+</label>
+<label class="option-tile option-tile-row">
+<input type="radio" name="font_size" value="large"{% if preferences.font_size == 'large' %} checked{% endif %}>
+<span class="option-copy"><strong>Large</strong><small>Easier on the eyes.</small></span>
+</label>
+</div>
+</section>
+
+<div class="settings-save">
+<button type="submit">Save settings</button>
+<span class="muted">Applies immediately after saving.</span>
+</div>
+</form>
+
+<section class="panel security-panel" aria-labelledby="security-heading">
+<h2 id="security-heading">Password</h2>
+<p class="muted">Change the password used to sign in to your account.</p>
+<a class="btn" href="{{ url_for('profile.password_page') }}">Change password</a>
+</section>
+</main>
+<script>
+(function () {
+  var root = document.documentElement;
+  var form = document.querySelector('.settings-form');
+  if (!form) return;
+  form.addEventListener('change', function (event) {
+    var input = event.target;
+    if (input.name === 'theme') root.setAttribute('data-theme', input.value);
+    if (input.name === 'font_family') root.setAttribute('data-font', input.value);
+    if (input.name === 'font_size') root.setAttribute('data-font-size', input.value);
+  });
+}());
+</script>
+</body>
+</html>

@@ -20,7 +20,7 @@
   <a href="{{ url_for('equipment_dashboard', view='maintenance') }}" {% if p.startswith('/equipment') and v == 'maintenance' %}aria-current="page"{% endif %}><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i> Maintenance</a>
   <a href="{{ url_for('equipment_dashboard', view='reports') }}" {% if p.startswith('/equipment') and v == 'reports' %}aria-current="page"{% endif %}><i class="fa-solid fa-flag" aria-hidden="true"></i> Reports</a>
   <a href="{{ url_for('equipment_dashboard', view='catalogs') }}" {% if p.startswith('/equipment') and v == 'catalogs' %}aria-current="page"{% endif %}><i class="fa-solid fa-list" aria-hidden="true"></i> Catalogs</a>
-  {% if current_user.is_dean or current_user.is_admin %}
+  {% if current_user.is_admin %}
   <a href="{{ url_for('equipment_dashboard', view='users') }}" {% if p.startswith('/equipment') and v == 'users' %}aria-current="page"{% endif %}><i class="fa-solid fa-users" aria-hidden="true"></i> User access</a>
   {% endif %}
   {% elif current_user.can_borrow_equipment %}
@@ -46,5 +46,6 @@
   <a href="{{ url_for('index') }}" {% if p == '/' %}aria-current="page"{% endif %}><i class="fa-solid fa-network-wired" aria-hidden="true"></i> System</a>
   {% endif %}
   <a href="{{ url_for('profile.profile_page') }}" {% if p.startswith('/profile') %}aria-current="page"{% endif %}><i class="fa-solid fa-user" aria-hidden="true"></i> Profile</a>
+  <a href="{{ url_for('profile.settings_page') }}" {% if p.startswith('/settings') %}aria-current="page"{% endif %}><i class="fa-solid fa-gear" aria-hidden="true"></i> Settings</a>
   <a class="dash-logout" href="{{ url_for('logout') }}"><i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i> Log out</a>
 </aside>

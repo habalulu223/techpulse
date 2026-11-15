@@ -13,6 +13,11 @@ section{padding:74px 0}.section-head{max-width:660px;margin:0 auto 38px;text-ali
 .how{background:rgba(13,32,56,.55);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.step{padding:22px 18px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.025)}.step-number{color:var(--cyan);font-size:.8rem;font-weight:850;letter-spacing:.12em}.step h3{margin:9px 0 6px}.step p{margin:0;color:var(--muted);font-size:.88rem}.about-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:50px;align-items:center}.about-panel{padding:28px;border:1px solid var(--line);border-radius:18px;background:var(--panel)}.about-panel strong{color:var(--cyan)}.cta{padding:42px;border:1px solid rgba(67,224,232,.22);border-radius:22px;text-align:center;background:linear-gradient(120deg,rgba(22,83,135,.38),rgba(14,42,69,.8))}.cta p{color:var(--muted);margin:0 auto 23px;max-width:590px}footer{padding:27px 0;border-top:1px solid var(--line);color:#8398b1;font-size:.85rem}.footer-inner{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 @media(max-width:850px){.hero-grid,.about-grid{grid-template-columns:1fr}.hero{padding-top:62px}.visual-wrap{max-width:600px;margin:auto;width:100%}.features{grid-template-columns:repeat(2,1fr)}.steps{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.container{width:min(100% - 28px,1120px)}.nav{min-height:66px}.nav-links{gap:12px}.nav-links a:not(.btn){display:none}.hero{padding:50px 0 58px}.hero-grid{gap:36px}.features,.steps{grid-template-columns:1fr}.preview{padding:15px;transform:none}.stat{padding:12px}.cta{padding:30px 18px}section{padding:58px 0}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition-duration:.01ms!important}}
 
+/* Primary navigation row */
+.nav-links{display:flex;align-items:center;gap:22px}
+.nav-links a:not(.btn){color:#c9d7e8;font-weight:600;font-size:.92rem}
+.nav-links a:not(.btn):hover{color:#fff}
+
 /* Extracted inline styles */
 .u-style-1 { font-size:.9rem; }
 .u-style-2 { margin-bottom:0; }

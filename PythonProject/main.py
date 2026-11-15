@@ -9,7 +9,6 @@ import sys
 import json
 import threading
 import time
-from datetime import datetime
 from urllib import request as http_request
 from urllib import error as http_error
 from urllib import parse as http_parse
@@ -26,7 +25,6 @@ try:
     from kivy.uix.button import Button
     from kivy.uix.textinput import TextInput
     from kivy.uix.scrollview import ScrollView
-    from kivy.uix.spinner import Spinner
     from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelHeader, TabbedPanelItem
     from kivy.uix.screenmanager import Screen, ScreenManager
     from kivy.core.window import Window
@@ -99,9 +97,6 @@ except ImportError:
         pass
 
     class ScrollView(_FallbackWidget):
-        pass
-
-    class Spinner(_FallbackWidget):
         pass
 
     class TabbedPanel(_FallbackWidget):
@@ -236,20 +231,20 @@ class LoginScreen(Screen):
                 result = json.loads(response.read().decode("utf-8"))
             if result.get("ok"):
                 Clock.schedule_once(lambda dt: self._login_success(
-                    server, port, result["username"], result["user_id"], result["balance"]
+                    server, port, result["username"], result["user_id"]
                 ), 0)
             else:
                 Clock.schedule_once(lambda dt: self._login_failed(result.get("error", "Sign in failed.")), 0)
         except Exception as e:
             Clock.schedule_once(lambda dt: self._login_failed(f"Sign in failed: {str(e)}"), 0)
 
-    def _login_success(self, server, port, username, user_id, balance):
+    def _login_success(self, server, port, username, user_id):
         self.status_label.text = "Sign in successful."
         self.status_label.color = (0, 0.65, 0, 1)
         self.login_button.disabled = False
         app = App.get_running_app()
         app.server_host, app.server_port = server, port
-        app.username, app.user_id, app.balance = username, user_id, balance
+        app.username, app.user_id = username, user_id
         app.save_server_settings()
         app.root.current = "main"
 
@@ -268,74 +263,8 @@ class MainScreen(Screen):
         self.header = Label(text='Techpuls Mobile - Welcome!', size_hint_y=None, height=dp(50), font_size=dp(18))
         self.layout.add_widget(self.header)
 
-        # Balance display
-        self.balance_label = Label(text='Balance: Loading...', size_hint_y=None, height=dp(40))
-        self.layout.add_widget(self.balance_label)
-
         # Tabbed panel for main content
         self.tab_panel = TabbedPanel(do_default_tab=False, tab_height=dp(40))
-
-        # Bookings tab
-        bookings_tab = TabbedPanelHeader(text='Bookings')
-        bookings_content = BoxLayout(orientation='vertical')
-        
-        # Bookings list
-        self.bookings_scroll = ScrollView()
-        self.bookings_layout = GridLayout(cols=3, size_hint_y=None, spacing=dp(1))
-        self.bookings_layout.bind(minimum_height=self.bookings_layout.setter('height'))
-        self.bookings_scroll.add_widget(self.bookings_layout)
-        bookings_content.add_widget(self.bookings_scroll)
-
-        # New booking section
-        new_booking_layout = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(200), padding=dp(10))
-        new_booking_layout.add_widget(Label(text='Make New Booking', font_size=dp(16), size_hint_y=None, height=dp(30)))
-
-        # PC selection
-        pc_layout = BoxLayout(size_hint_y=None, height=dp(40))
-        pc_layout.add_widget(Label(text='PC:', size_hint_x=None, width=dp(50)))
-        self.pc_spinner = Spinner(text='Loading PCs...', values=[])
-        pc_layout.add_widget(self.pc_spinner)
-        new_booking_layout.add_widget(pc_layout)
-
-        # Date and time
-        datetime_layout = GridLayout(cols=2, size_hint_y=None, height=dp(80), spacing=dp(10))
-        datetime_layout.add_widget(Label(text='Date:'))
-        self.date_input = TextInput(hint_text='YYYY-MM-DD', multiline=False)
-        datetime_layout.add_widget(self.date_input)
-        datetime_layout.add_widget(Label(text='Time:'))
-        self.time_input = TextInput(hint_text='HH:MM', multiline=False)
-        datetime_layout.add_widget(self.time_input)
-        new_booking_layout.add_widget(datetime_layout)
-
-        # Book button
-        self.book_button = Button(text='Book Now', size_hint_y=None, height=dp(40), on_press=self.make_booking)
-        new_booking_layout.add_widget(self.book_button)
-
-        bookings_content.add_widget(new_booking_layout)
-        bookings_tab.content = bookings_content
-        self.tab_panel.add_widget(bookings_tab)
-
-        # Top Up tab
-        topup_tab = TabbedPanelHeader(text='Top Up')
-        self.topup_tab = topup_tab
-        topup_content = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(10))
-        topup_content.add_widget(Label(text='Create Top-Up Request', size_hint_y=None, height=dp(30), font_size=dp(16)))
-
-        self.topup_amount_input = TextInput(hint_text='Amount (PHP)', multiline=False, input_filter='float', size_hint_y=None, height=dp(45))
-        topup_content.add_widget(self.topup_amount_input)
-
-        quick_topup_row = GridLayout(cols=4, size_hint_y=None, height=dp(45), spacing=dp(8))
-        for quick_amount in (100, 200, 500, 1000):
-            quick_btn = Button(text=f'PHP {quick_amount}', on_press=lambda inst, amt=quick_amount: self.set_topup_amount(amt))
-            quick_topup_row.add_widget(quick_btn)
-        topup_content.add_widget(quick_topup_row)
-
-        self.topup_submit_button = Button(text='Submit Top-Up Request', size_hint_y=None, height=dp(45), on_press=self.submit_topup_request)
-        topup_content.add_widget(self.topup_submit_button)
-        topup_content.add_widget(Label(text='Top-up requests are saved for admin confirmation.', size_hint_y=None, height=dp(28)))
-
-        topup_tab.content = topup_content
-        self.tab_panel.add_widget(topup_tab)
 
         # Updates tab
         updates_tab = TabbedPanelHeader(text='Updates')
@@ -377,8 +306,6 @@ class MainScreen(Screen):
 
         # Bottom buttons
         button_layout = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(10), padding=dp(10))
-        self.topup_button = Button(text='Top Up', on_press=self.show_topup)
-        button_layout.add_widget(self.topup_button)
         self.logout_button = Button(text='Logout', on_press=self.do_logout)
         button_layout.add_widget(self.logout_button)
         self.layout.add_widget(button_layout)
@@ -396,89 +323,7 @@ class MainScreen(Screen):
         app = App.get_running_app()
         if hasattr(app, 'username') and app.username:
             self.header.text = f'Techpuls Mobile - {app.username}'
-            threading.Thread(target=self._fetch_balance, daemon=True).start()
-            threading.Thread(target=self._fetch_bookings, daemon=True).start()
-            threading.Thread(target=self._fetch_pcs, daemon=True).start()
             threading.Thread(target=self._fetch_updates, daemon=True).start()
-
-    def _fetch_balance(self):
-        app = App.get_running_app()
-        try:
-            # Use balance from login for now (in real app, fetch updated balance)
-            balance = getattr(app, 'balance', 0.0)
-            Clock.schedule_once(lambda dt: self._update_balance(f"Balance: PHP {balance:.2f}"), 0)
-        except Exception as e:
-            Clock.schedule_once(lambda dt: self._update_balance(f"Error loading balance: {str(e)}"), 0)
-
-    def _update_balance(self, text):
-        self.balance_label.text = text
-
-    def _fetch_bookings(self):
-        app = App.get_running_app()
-        try:
-            base_url = f"http://{app.server_host}:{app.server_port}"
-            url = f"{base_url}/api/mobile/bookings?user_id={app.user_id}"
-            
-            with http_request.urlopen(url, timeout=10) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                
-                if result.get("ok"):
-                    bookings = result.get("bookings", [])
-                    Clock.schedule_once(lambda dt: self._update_bookings(bookings), 0)
-                else:
-                    Clock.schedule_once(lambda dt: self._update_bookings([]), 0)
-        except Exception as e:
-            print(f"Error fetching bookings: {e}")
-            Clock.schedule_once(lambda dt: self._update_bookings([]), 0)
-
-    def _update_bookings(self, bookings):
-        self.bookings_layout.clear_widgets()
-        if not bookings:
-            self.bookings_layout.cols = 1
-            self.bookings_layout.add_widget(Label(text="No bookings yet. Make a booking below.", size_hint_y=None, height=dp(56)))
-            return
-
-        self.bookings_layout.cols = 3
-        for heading in ("PC", "DATE & TIME", "STATUS"):
-            self.bookings_layout.add_widget(Label(text=heading, bold=True, size_hint_y=None, height=dp(38)))
-        for booking in bookings:
-            status = str(booking.get("status", "Unknown"))
-            status_color = (0, 0.65, 0, 1) if status.lower() in {"confirmed", "approved"} else (0.8, 0.4, 0, 1)
-            for value, color in (
-                (booking.get("pc_name", "—"), (1, 1, 1, 1)),
-                (f"{booking.get('date', '—')}\n{booking.get('time', '')}", (1, 1, 1, 1)),
-                (status.title(), status_color),
-            ):
-                cell = Label(text=str(value), color=color, size_hint_y=None, height=dp(58), halign="center", valign="middle")
-                cell.bind(size=lambda widget, _size: setattr(widget, "text_size", widget.size))
-                self.bookings_layout.add_widget(cell)
-
-    def _fetch_pcs(self):
-        app = App.get_running_app()
-        try:
-            base_url = f"http://{app.server_host}:{app.server_port}"
-            url = f"{base_url}/api/mobile/pcs"
-            
-            with http_request.urlopen(url, timeout=10) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                
-                if result.get("ok"):
-                    pcs = result.get("pcs", [])
-                    pc_names = [pc['name'] for pc in pcs if not pc['is_occupied']]
-                    Clock.schedule_once(lambda dt: self._update_pc_spinner(pc_names), 0)
-                else:
-                    Clock.schedule_once(lambda dt: self._update_pc_spinner([]), 0)
-        except Exception as e:
-            print(f"Error fetching PCs: {e}")
-            Clock.schedule_once(lambda dt: self._update_pc_spinner([]), 0)
-
-    def _update_pc_spinner(self, pc_names):
-        if pc_names:
-            self.pc_spinner.values = pc_names
-            self.pc_spinner.text = pc_names[0]
-        else:
-            self.pc_spinner.values = []
-            self.pc_spinner.text = 'No PCs available'
 
     def _fetch_updates(self):
         app = App.get_running_app()
@@ -598,154 +443,10 @@ class MainScreen(Screen):
     def _enable_send_button(self):
         self.send_button.disabled = False
 
-    def make_booking(self, instance):
-        pc = self.pc_spinner.text
-        date = self.date_input.text
-        time = self.time_input.text
-
-        if pc in {'Select PC', 'No PCs available', 'Loading PCs...'}:
-            self.status_label.text = "Choose an available PC first."
-            self.status_label.color = (1, 0, 0, 1)
-            return
-        try:
-            datetime.strptime(date, "%Y-%m-%d")
-            datetime.strptime(time, "%H:%M")
-        except ValueError:
-            self.status_label.text = "Enter a valid date (YYYY-MM-DD) and time (HH:MM)."
-            self.status_label.color = (1, 0, 0, 1)
-            return
-
-        app = App.get_running_app()
-        if not hasattr(app, 'user_id'):
-            self.status_label.text = "Not logged in"
-            return
-
-        self.book_button.disabled = True
-        self.status_label.text = f"Booking {pc} for {date} {time}..."
-        self.status_label.color = (0, 0, 1, 1)
-
-        # Send booking request to server
-        threading.Thread(target=self._send_booking, args=(pc, date, time), daemon=True).start()
-
-    def _send_booking(self, pc_name, date, time):
-        app = App.get_running_app()
-        try:
-            base_url = f"http://{app.server_host}:{app.server_port}"
-            
-            # Find PC ID by name
-            pc_id = None
-            pcs_url = f"{base_url}/api/mobile/pcs"
-            with http_request.urlopen(pcs_url, timeout=10) as response:
-                pcs_result = json.loads(response.read().decode('utf-8'))
-                if pcs_result.get("ok"):
-                    for pc in pcs_result.get("pcs", []):
-                        if pc['name'] == pc_name:
-                            pc_id = pc['id']
-                            break
-            
-            if not pc_id:
-                Clock.schedule_once(lambda dt: self._booking_failed("PC not found"), 0)
-                return
-
-            # Send booking request
-            booking_data = {
-                "user_id": app.user_id,
-                "pc_id": pc_id,
-                "date": date,
-                "time": time
-            }
-            
-            data = http_parse.urlencode(booking_data).encode('utf-8')
-            req = http_request.Request(f"{base_url}/api/mobile/book", data=data, method='POST')
-            req.add_header('Content-Type', 'application/x-www-form-urlencoded')
-
-            with http_request.urlopen(req, timeout=10) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                
-                if result.get("ok"):
-                    Clock.schedule_once(lambda dt: self._booking_success(), 0)
-                else:
-                    Clock.schedule_once(lambda dt: self._booking_failed(result.get("error", "Booking failed")), 0)
-
-        except Exception as e:
-            Clock.schedule_once(lambda dt: self._booking_failed(f"Booking failed: {str(e)}"), 0)
-
-    def _booking_success(self):
-        self.status_label.text = "Booking successful!"
-        self.status_label.color = (0, 1, 0, 1)
-        self.book_button.disabled = False
-        self.refresh_data(None)
-
-    def _booking_failed(self, message):
-        self.status_label.text = message
-        self.status_label.color = (1, 0, 0, 1)
-        self.book_button.disabled = False
-
-    def show_topup(self, instance):
-        self.tab_panel.switch_to(self.topup_tab)
-
-    def set_topup_amount(self, amount):
-        self.topup_amount_input.text = str(amount)
-
-    def submit_topup_request(self, instance):
-        raw_amount = self.topup_amount_input.text.strip()
-        if not raw_amount:
-            self.status_label.text = "Enter top-up amount"
-            self.status_label.color = (1, 0, 0, 1)
-            return
-
-        self.topup_submit_button.disabled = True
-        threading.Thread(target=self._submit_topup_request, args=(raw_amount,), daemon=True).start()
-
-    def _submit_topup_request(self, raw_amount):
-        app = App.get_running_app()
-        try:
-            amount = float(raw_amount)
-            if amount <= 0:
-                raise ValueError("Amount must be positive")
-
-            payload = {
-                "user_id": app.user_id,
-                "amount": amount,
-            }
-            base_url = f"http://{app.server_host}:{app.server_port}"
-            req = http_request.Request(
-                f"{base_url}/api/mobile/topup",
-                data=json.dumps(payload).encode('utf-8'),
-                method='POST',
-                headers={"Content-Type": "application/json"},
-            )
-
-            with http_request.urlopen(req, timeout=10) as response:
-                result = json.loads(response.read().decode('utf-8'))
-
-            if not result.get("ok"):
-                message = result.get("error", "Top-up request failed")
-                Clock.schedule_once(lambda dt, msg=message: self._topup_failed(msg), 0)
-                return
-
-            message = result.get("message", "Top-up request submitted")
-            Clock.schedule_once(lambda dt, msg=message: self._topup_success(msg), 0)
-        except Exception as exc:
-            Clock.schedule_once(lambda dt, msg=str(exc): self._topup_failed(f"Top-up failed: {msg}"), 0)
-
-    def _topup_success(self, message):
-        self.status_label.text = message
-        self.status_label.color = (0, 1, 0, 1)
-        self.topup_submit_button.disabled = False
-        self.topup_amount_input.text = ""
-        self.refresh_data(None)
-
-    def _topup_failed(self, message):
-        self.status_label.text = message
-        self.status_label.color = (1, 0, 0, 1)
-        self.topup_submit_button.disabled = False
-
     def do_logout(self, instance):
         app = App.get_running_app()
         app.username = None
         app.user_id = None
-        app.balance = 0.0
         app.root.current = 'login'
         self.status_label.text = ""
 
@@ -757,7 +458,6 @@ class TechpulsMobileApp(App):
         self.server_port = DEFAULT_SERVER_PORT
         self.username = None
         self.user_id = None
-        self.balance = 0.0
 
     def build(self):
         # Set window size for mobile-like experience on desktop

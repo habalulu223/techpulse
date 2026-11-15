@@ -99,7 +99,14 @@ body.login-intro {
     overflow-x: hidden;
 }
 
-.login-shell {
+/* The shared theme paints .login-shell/.register as white cards. The login page
+   relies on its dark backdrop, so keep only the panel itself and let the
+   animated background show through. */
+body .login-shell {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
     min-height: calc(100vh - 32px);
     display: flex;
     justify-content: center;
@@ -107,6 +114,42 @@ body.login-intro {
     width: 100%;
     position: relative;
     z-index: 5;
+}
+
+body .login-box .register {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.login-back {
+    position: fixed;
+    top: 22px;
+    left: 22px;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 15px;
+    border: 1px solid rgba(159,190,225,.3);
+    border-radius: 999px;
+    background: rgba(13,32,56,.55);
+    backdrop-filter: blur(10px);
+    color: #dce8f6 !important;
+    font-size: .88rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+body .login-back:hover {
+    background: rgba(26,53,82,.85) !important;
+    border-color: #43e0e8 !important;
+    color: #fff !important;
+}
+
+body .login-back i {
+    color: currentColor !important;
 }
 
 .login-box {
@@ -214,23 +257,15 @@ body .login-box button.password-toggle {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
+    /* The shared theme forces button padding with !important; without pinning
+       it here the 34px button gets a ~2px content box and the icon collapses. */
+    padding: 0 !important;
     margin: 0;
     background: transparent !important;
     border: none !important;
     border-radius: 7px;
     color: #91a4ba !important;
     cursor: pointer;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transition: opacity .15s ease, visibility .15s ease;
-}
-
-body .login-box button.password-toggle.is-visible {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
 }
 
 body .login-box button.password-toggle:hover {
@@ -240,6 +275,9 @@ body .login-box button.password-toggle:hover {
 
 body .login-box button.password-toggle svg {
     display: block;
+    flex: none;
+    width: 20px;
+    height: 20px;
     color: #91a4ba !important;
     stroke: #91a4ba !important;
     fill: none !important;
@@ -290,6 +328,21 @@ button[type=submit] {
 button[type=submit]:hover {
     filter: brightness(1.08);
     transform: translateY(-1px);
+}
+
+/* The shared theme repaints every button navy with !important; keep the
+   sign-in and download actions on the page's accent gradient. */
+body .login-box button[type=submit],
+body .login-box .download .btn {
+    background: linear-gradient(110deg,#43e0e8,#55a4ff) !important;
+    color: #071426 !important;
+    border: 1px solid transparent !important;
+}
+
+body .login-box button[type=submit]:hover,
+body .login-box .download .btn:hover {
+    background: linear-gradient(110deg,#43e0e8,#55a4ff) !important;
+    color: #071426 !important;
 }
 
 .divider {
