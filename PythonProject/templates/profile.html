@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">{% include '_dashboard_container_theme.html' %}
 </head>
 <body>
+{% include '_dashboard_nav.html' %}
 {% set header_title = 'My profile' %}
 {% set header_subtitle = 'Manage your account photo, cover, and security.' %}
 {% include '_app_header.html' %}
@@ -30,56 +31,43 @@
       </form>
       {% endif %}
     </div>
-  </div>
-  <div class="profile-summary">
-    <div class="profile-avatar">
-      {% if profile_user.profile_picture %}<img src="{{ url_for('profile.profile_picture', v=profile_picture_version) }}" alt="Profile picture for {{ profile_name }}">{% else %}<span aria-hidden="true">{{ profile_name[:1]|upper }}</span>{% endif %}
-    </div>
-    <div class="profile-summary-copy">
-      <p class="profile-name">{{ profile_name }}</p>
-      <p class="profile-meta">{{ profile_role }} &middot; @{{ current_user.username }}</p>
-    </div>
-    <div class="profile-actions">
-      <a class="btn btn-secondary" href="{{ url_for('profile.password_page') }}"><i class="fa-solid fa-key" aria-hidden="true"></i> Change password</a>
-      <a class="btn" href="{{ url_for('profile.settings_page') }}"><i class="fa-solid fa-gear" aria-hidden="true"></i> Settings</a>
+    <div class="profile-summary">
+      <div class="profile-avatar">
+        {% if profile_user.profile_picture %}<img src="{{ url_for('profile.profile_picture', v=profile_picture_version) }}" alt="Profile picture for {{ profile_name }}">{% else %}<span aria-hidden="true">{{ profile_name[:1]|upper }}</span>{% endif %}
+        <form method="post" enctype="multipart/form-data" class="avatar-upload">
+          <input type="hidden" name="action" value="upload_picture">
+          <input class="cover-file" id="profile-picture" type="file" name="profile_picture" accept="image/png,image/jpeg,image/webp" required onchange="this.form.submit()">
+          <label class="avatar-edit" for="profile-picture" title="Change profile picture"><i class="fa-solid fa-camera" aria-hidden="true"></i><span class="sr-only">Change profile picture</span></label>
+        </form>
+      </div>
+      <div class="profile-summary-copy">
+        <p class="profile-name">{{ profile_name }}</p>
+        <p class="profile-meta">{{ profile_role }} &middot; @{{ current_user.username }}</p>
+      </div>
     </div>
   </div>
 </div>
 
-{% set theme_name = 'Dark' if (current_user.theme or 'light') == 'dark' else 'Light' %}
-{% set family_names = {'inter': 'Inter', 'system': 'System', 'serif': 'Serif'} %}
-{% set size_names = {'compact': 'Compact', 'default': 'Default', 'large': 'Large'} %}
-<div class="layout">
-<section class="panel" aria-labelledby="account-heading">
-<h2 id="account-heading">Account details</h2>
-<div class="identity">
-{% if profile_user.profile_picture %}<img class="avatar" src="{{ url_for('profile.profile_picture', v=profile_picture_version) }}" alt="Profile picture for {{ profile_name }}">{% else %}<div class="avatar avatar-placeholder" aria-hidden="true">{{ profile_name[:1]|upper }}</div>{% endif %}
-<div><div class="identity-name">{{ profile_name }}</div><div class="identity-role">{{ profile_role }}</div></div>
+<div class="profile-toolbar">
+  <a class="btn" href="{{ url_for('profile.settings_page') }}"><i class="fa-solid fa-gear" aria-hidden="true"></i> Settings</a>
 </div>
-<dl class="details"><div class="detail"><dt>Name</dt><dd>{{ profile_name }}</dd></div><div class="detail"><dt>Role</dt><dd>{{ profile_role }}</dd></div><div class="detail"><dt>Account ID</dt><dd>#{{ profile_user.id }}</dd></div><div class="detail"><dt>Username</dt><dd>{{ profile_user.username }}</dd></div></dl>
-<form method="post" enctype="multipart/form-data" class="field">
-<input type="hidden" name="action" value="upload_picture">
-<label for="profile-picture">Profile picture</label>
-<input id="profile-picture" type="file" name="profile_picture" accept="image/png,image/jpeg,image/webp" required>
-<span class="help">JPG, PNG, or WebP &middot; up to 2 MB. The image is stored in the account database.</span>
-<div class="actions"><button type="submit">Save picture</button></div>
-</form>
-{% if profile_user.profile_picture %}<form method="post" class="actions"><input type="hidden" name="action" value="remove_picture"><button class="secondary" type="submit">Remove picture</button></form>{% endif %}
-</section>
 
-<section class="panel" aria-labelledby="preferences-heading">
-<h2 id="preferences-heading">Preferences</h2>
-<p class="muted">Personalise how TechPulse looks for your account and manage your password.</p>
-<dl class="details">
-<div class="detail"><dt>Theme</dt><dd>{{ theme_name }}</dd></div>
-<div class="detail"><dt>Font</dt><dd>{{ family_names.get(current_user.font_family or 'inter', 'Inter') }} &middot; {{ size_names.get(current_user.font_size or 'default', 'Default') }}</dd></div>
-<div class="detail"><dt>Cover photo</dt><dd>{{ 'Added' if profile_user.cover_picture else 'Not set' }}</dd></div>
-</dl>
-<div class="actions">
-<a class="btn" href="{{ url_for('profile.settings_page') }}"><i class="fa-solid fa-gear" aria-hidden="true"></i> Open settings</a>
-</div>
+<section class="panel recent-reports" aria-labelledby="recent-reports-heading">
+  <div class="recent-reports-head">
+    <h2 id="recent-reports-heading">Recent posted reports</h2>
+    {% if reports_url %}<a class="recent-reports-link" href="{{ reports_url }}">View all →</a>{% endif %}
+  </div>
+  {% for issue in recent_reports %}
+  <div class="report-row">
+    <b>{{ issue.issue_title }}</b>
+    <span class="report-equipment">{{ issue.equipment.equipment_code if issue.equipment else 'Equipment' }}</span>
+    <div class="muted">{{ issue.reported_at.strftime('%d %b %Y, %H:%M') }}</div>
+    {% if issue.issue_description %}<p class="report-description">{{ issue.issue_description }}</p>{% endif %}
+  </div>
+  {% else %}
+  <p class="muted empty-reports">No reports posted yet.</p>
+  {% endfor %}
 </section>
-</div>
 </main>
 </body>
 </html>

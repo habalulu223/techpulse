@@ -8,10 +8,13 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">{% include '_dashboard_container_theme.html' %}
 </head>
 <body>
+{% include '_dashboard_nav.html' %}
 {% set header_title = 'Settings' %}
 {% set header_subtitle = 'Choose how TechPulse looks for your account.' %}
+{% set header_actions = [{'label': 'Back to profile', 'url': url_for('profile.profile_page'), 'icon': 'fa-solid fa-arrow-left'}] %}
 {% include '_app_header.html' %}
 <main class="settings-main">
+<p class="settings-back"><a class="btn btn-secondary" href="{{ url_for('profile.profile_page') }}"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to profile</a></p>
 <h1>Settings</h1>
 <p class="subtitle">Your appearance preferences are saved to your account and apply on every page.</p>
 {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="flash {{ category }}" role="status">{{ message }}</div>{% endfor %}{% endwith %}

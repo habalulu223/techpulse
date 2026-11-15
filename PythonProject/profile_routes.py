@@ -43,7 +43,7 @@ def read_profile_image(image):
     return image_data, image_type, None
 
 
-def create_profile_blueprint(db, user_model):
+def create_profile_blueprint(db, user_model, get_recent_reports=None):
     """Create profile endpoints without coupling their logic to app.py."""
     profile = Blueprint("profile", __name__)
 
@@ -178,11 +178,17 @@ def create_profile_blueprint(db, user_model):
             return redirect(url_for("profile.profile_page"))
 
         role_name = "Administrator" if current_user.is_admin else (current_user.role or "student").replace("_", " ").title()
+        recent_reports = []
+        reports_url = None
+        if get_recent_reports is not None:
+            recent_reports, reports_url = get_recent_reports(current_user)
         return render_template(
             "profile.html",
             profile_user=current_user,
             profile_name=current_user.full_name or current_user.username,
             profile_role=role_name,
+            recent_reports=recent_reports,
+            reports_url=reports_url,
         )
 
     @profile.route("/profile/picture")

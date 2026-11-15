@@ -1,5 +1,13 @@
 /* Appearance settings page. Complements profile.css and the --tp-* tokens. */
 
+.settings-back { margin: 0 0 10px !important; }
+.settings-back .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-back .btn i { color: inherit !important; -webkit-text-fill-color: inherit !important; }
+
 .settings-form { display: grid; gap: 16px; margin: 0 !important; }
 .settings-form .panel { margin: 0 !important; }
 
@@ -38,8 +46,8 @@
 .option-tile-row { padding: 12px 14px; }
 
 .option-copy { display: grid; gap: 2px; min-width: 0; }
-.option-copy strong { font-size: .98rem; color: var(--tp-ink); }
-.option-copy small { font-size: .85rem; color: var(--tp-muted); }
+.option-copy strong { font-size: clamp(0.9rem, 0.3vw + 0.82rem, 1rem); color: var(--tp-ink); }
+.option-copy small { font-size: clamp(0.78rem, 0.25vw + 0.7rem, 0.9rem); color: var(--tp-muted); }
 
 .theme-swatch {
   position: relative;
@@ -67,7 +75,7 @@
 .theme-swatch-dark::before { background: #0a1320; }
 .theme-swatch-dark::after { background: #3a4c66; box-shadow: 0 9px 0 #2b3d55, 0 18px 0 #2b3d55; }
 
-.option-preview strong { font-size: 1.05rem; }
+.option-preview strong { font-size: clamp(0.95rem, 0.35vw + 0.85rem, 1.1rem); }
 .font-inter { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
 .font-system { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
 .font-serif { font-family: Georgia, "Times New Roman", Cambria, serif; }
@@ -75,7 +83,7 @@
 .panel .sub-heading { margin: 20px 0 10px !important; }
 
 .settings-save { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.settings-save .muted { margin: 0; font-size: .9rem; }
+.settings-save .muted { margin: 0; font-size: clamp(0.8rem, 0.25vw + 0.72rem, 0.95rem); }
 
 .security-panel .btn { margin-top: 2px; }
 

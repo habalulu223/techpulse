@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Campus Equipment Tracker</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/equipment.css') }}">{% include '_dashboard_container_theme.html' %}</head><body>
-    {% include '_animated_background.html' %}
+{% include '_dashboard_nav.html' %}
 {% set header_title = 'Campus IT Equipment Tracker' %}
 {% set header_subtitle = 'Availability, accountability, condition, maintenance, and room-aware network records.' %}
 {% set header_role = role|replace('_',' ')|title %}

@@ -538,9 +538,6 @@ def authenticate_credentials(identity, password):
     return user
 
 
-app.register_blueprint(create_profile_blueprint(db, User))
-
-
 class Equipment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     asset_tag = db.Column(db.String(64), unique=True, nullable=False, index=True)
@@ -1284,6 +1281,31 @@ def ensure_community_user(account):
         identity.password_hash = account.password_hash
         identity.account_status = 'Active' if account.is_active_staff else 'Inactive'
     return identity
+
+
+def profile_recent_reports(user):
+    """Return recent issue reports and a dashboard link for the profile page."""
+    identity = ensure_community_user(user)
+    if identity is None:
+        return [], None
+    if user.can_manage_equipment:
+        reports = CommunityIssue.query.order_by(CommunityIssue.reported_at.desc()).limit(8).all()
+        reports_url = url_for('equipment_dashboard', view='reports')
+    elif user.can_borrow_equipment:
+        reports = (
+            CommunityIssue.query.filter_by(reported_by=identity.user_id)
+            .order_by(CommunityIssue.reported_at.desc())
+            .limit(8)
+            .all()
+        )
+        reports_url = url_for('borrower_dashboard', view='reports')
+    else:
+        reports = []
+        reports_url = None
+    return reports, reports_url
+
+
+app.register_blueprint(create_profile_blueprint(db, User, get_recent_reports=profile_recent_reports))
 
 
 def community_audit(action, table_name, record_id=None, old_value=None, new_value=None, actor=None):
@@ -3117,42 +3139,6 @@ def handle_server_error(error):
         title='Something went wrong',
         message='The server hit an unexpected problem. The details were recorded in the '
                 'server log, so the equipment team can look into it.'), 500
-
-
-@app.after_request
-def apply_professional_dashboard_theme(response):
-    """Apply the shared theme only to the dashboard pages that use injection."""
-    themed_paths = {"/equipment", "/borrower", "/dean/pcs"}
-    if (
-        request.path not in themed_paths
-        or request.method != "GET"
-        or response.status_code != 200
-        or response.is_streamed
-        or "text/html" not in response.content_type
-    ):
-        return response
-
-    markup = response.get_data(as_text=True)
-    stylesheet = f'<link rel="stylesheet" href="{url_for("static", filename="professional.css")}">'
-    markup = re.sub(r"<link\b[^>]*professional\.css[^>]*>", "", markup, flags=re.IGNORECASE)
-
-    if 'class="cyber-bg"' not in markup and re.search(r"<body(?:\s[^>]*)?>", markup, re.IGNORECASE):
-        background = render_template("_animated_background.html")
-        markup = re.sub(
-            r"<body(?:\s[^>]*)?>",
-            lambda match: match.group(0) + background,
-            markup,
-            count=1,
-            flags=re.IGNORECASE,
-        )
-
-    if re.search(r"</body\s*>", markup, re.IGNORECASE):
-        markup = re.sub(r"</body\s*>", lambda match: stylesheet + match.group(0), markup, count=1, flags=re.IGNORECASE)
-    else:
-        markup = re.sub(r"</head\s*>", lambda match: stylesheet + match.group(0), markup, count=1, flags=re.IGNORECASE)
-
-    response.set_data(markup)
-    return response
 
 
 # --- Auth Routes ---
