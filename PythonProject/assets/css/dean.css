@@ -75,6 +75,13 @@ header h1 { margin: 0 0 5px; font-size: 1.5rem; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
 .pc { min-width: 0; padding: 15px; }
 .flash { padding: 10px; border-radius: 7px; }
+.gateway-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gateway-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 14px; margin: 18px 0; }
+.gateway-summary dt { font-size: .85rem; }
+.gateway-summary dd { margin: 4px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.gateway-table-scroll { max-width: 100%; overflow-x: auto; }
+.gateway-table-scroll table { width: 100%; border-collapse: collapse; text-align: left; }
+.gateway-table-scroll th, .gateway-table-scroll td { padding: 10px; overflow-wrap: anywhere; }
 @media (max-width: 700px) {
   header { align-items: flex-start; flex-wrap: wrap; }
   .dean-head-actions { justify-content: flex-start; }

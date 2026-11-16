@@ -1975,7 +1975,8 @@ def _run_gateway_scan_background():
             LAN_SCAN_CACHE["scan_in_progress"] = False
         return
     try:
-        result = _full_gateway_scan(summary)
+        with app.app_context():
+            result = _full_gateway_scan(summary)
         _store_gateway_scan_cache(summary["cidr"], result)
     except Exception:
         with LAN_SCAN_LOCK:
@@ -4852,7 +4853,9 @@ def dean_dashboard():
         {"label": "In use", "value": sum(pc.id in in_use_pc_ids for pc in pcs), "color": "#ff7184"},
         {"label": "Online", "value": sum(pc.id in online_pc_ids for pc in pcs), "color": "#58a8ff"},
     ]
-    return render_template('dean.html', pcs=pcs, pc_status_chart=pc_status_chart)
+    gateway_scan = get_gateway_client_scan(non_blocking=True)
+    return render_template('dean.html', pcs=pcs, pc_status_chart=pc_status_chart,
+        lan_summary=build_primary_ipv4_network_summary(), gateway_scan=gateway_scan)
 
 
 @app.route('/dean/analytics')

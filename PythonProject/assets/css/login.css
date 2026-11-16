@@ -142,6 +142,14 @@ body .login-box .register {
     transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
 
+body:not(.startup-complete) .login-back {
+    display: none;
+}
+
+body.startup-active .login-shell {
+    visibility: hidden;
+}
+
 body .login-back:hover {
     background: rgba(26,53,82,.85) !important;
     border-color: #43e0e8 !important;

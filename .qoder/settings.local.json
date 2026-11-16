@@ -66,7 +66,11 @@
       "Bash(ls -la /tmp/tphdr/ 2>/dev/null | head -20; echo \"---\"; ls \"$LOCALAPPDATA/Temp/tphdr\" 2>/dev/null)",
       "Bash(cd \"C:/Users/jush/PycharmProjects/techpulse/PythonProject\" && wc -l main.py desktop_app.py desktop_online_app.py smoke_test_ui.py smoke_test_auth.py smoke_test_google.py test_equipment_qr.py && grep -rniE \"topup|pondo|payment|balance|credit\" --include=\"desktop_app.py\" --include=\"desktop_online_app.py\" --include=\"Techpuls.spec\" --include=\"quickstart.bat\" --include=\"build_desktop_app.bat\" --include=\"build_android_safe.bat\" --include=\"test_equipment_qr.py\" . | head -80)",
       "Bash(cd \"C:/Users/jush/PycharmProjects/techpulse/PythonProject\" && py -3 -m py_compile app.py && echo COMPILE_OK)",
-      "Bash(cd \"C:/Users/jush/PycharmProjects/techpulse/PythonProject\" && py -3 -m py_compile app.py && echo COMPILE_OK && grep -nE \"^import time|time\\\\.\\(sleep|time|monotonic\\)\" app.py | head -20)"
+      "Bash(cd \"C:/Users/jush/PycharmProjects/techpulse/PythonProject\" && py -3 -m py_compile app.py && echo COMPILE_OK && grep -nE \"^import time|time\\\\.\\(sleep|time|monotonic\\)\" app.py | head -20)",
+      "Bash(ls -a \"C:/Users/USER19/PycharmProjects/PythonProject/PythonProject/techpulse/PythonProject\"; ls -a \"C:/Users/USER19/PycharmProjects/PythonProject/PythonProject/techpulse/PyPondoMobile\"; ls -a \"C:/Users/USER19/PycharmProjects/PythonProject/PythonProject/techpulse/.qoder\"; ls -a \"C:/Users/USER19/PycharmProjects/PythonProject/PythonProject\")",
+      "Read(//c/Users/USER19/PycharmProjects/PythonProject/**)",
+      "Bash(ls -a \"C:/Users/USER19/PycharmProjects/PythonProject\"; ls -a \"C:/Users/USER19/PycharmProjects\")",
+      "Read(//c/Users/USER19/**)"
     ]
   }
 }

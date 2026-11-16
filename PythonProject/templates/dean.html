@@ -37,6 +37,51 @@
         {% endfor %}
       </div>
     </section>
+    <section id="gateway-discovery" class="panel gateway-discovery" aria-labelledby="gateway-heading">
+      <div class="gateway-heading">
+        <div>
+          <h2 id="gateway-heading">Gateway Discovery</h2>
+          <p class="muted">Discover devices on the server's campus LAN.</p>
+        </div>
+        <form method="get" action="{{ url_for('dean_dashboard') }}#gateway-discovery">
+          <button type="submit">Refresh discovery</button>
+        </form>
+      </div>
+      {% if lan_summary %}
+        <dl class="gateway-summary">
+          <div><dt>Gateway IP</dt><dd>{{ lan_summary.gateway_ipv4 or 'Not available' }}</dd></div>
+          <div><dt>Server IP</dt><dd>{{ lan_summary.local_ipv4 or 'Not available' }}</dd></div>
+          <div><dt>Network</dt><dd>{{ lan_summary.cidr }}</dd></div>
+          <div><dt>Subnet mask</dt><dd>{{ lan_summary.subnet_mask or 'Not available' }}</dd></div>
+        </dl>
+      {% endif %}
+      {% if gateway_scan.ok %}
+        <p class="muted" role="status">
+          Detected clients: {{ gateway_scan.client_count }}.
+          {% if gateway_scan.stale %}Discovery is running in the background. Refresh to see the latest results.{% endif %}
+        </p>
+        {% if gateway_scan.clients %}
+          <div class="gateway-table-scroll" tabindex="0" role="region" aria-label="Discovered LAN devices">
+            <table>
+              <thead><tr><th scope="col">IP address</th><th scope="col">Device / PC</th><th scope="col">Room</th></tr></thead>
+              <tbody>
+                {% for host in gateway_scan.clients %}
+                  <tr>
+                    <td>{{ host.ip }}</td>
+                    <td>{{ host.mapped_pc_name or host.source_pc_name or host.hostname or 'Unknown device' }}</td>
+                    <td>{{ host.room or 'Not mapped' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="muted">No client devices have been detected on this subnet yet.</p>
+        {% endif %}
+      {% else %}
+        <p class="muted" role="status">Gateway discovery unavailable: {{ gateway_scan.error }}. Check the server's LAN connection and refresh.</p>
+      {% endif %}
+    </section>
     <div class="grid">
       {% for pc in pcs %}
         <div class="pc">
