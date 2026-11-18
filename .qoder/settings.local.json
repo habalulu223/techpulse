@@ -70,7 +70,9 @@
       "Bash(ls -a \"C:/Users/USER19/PycharmProjects/PythonProject/PythonProject/techpulse/PythonProject\"; ls -a \"C:/Users/USER19/PycharmProjects/PythonProject/PythonProject/techpulse/PyPondoMobile\"; ls -a \"C:/Users/USER19/PycharmProjects/PythonProject/PythonProject/techpulse/.qoder\"; ls -a \"C:/Users/USER19/PycharmProjects/PythonProject/PythonProject\")",
       "Read(//c/Users/USER19/PycharmProjects/PythonProject/**)",
       "Bash(ls -a \"C:/Users/USER19/PycharmProjects/PythonProject\"; ls -a \"C:/Users/USER19/PycharmProjects\")",
-      "Read(//c/Users/USER19/**)"
+      "Read(//c/Users/USER19/**)",
+      "Bash(\"C:/Users/USER19/PycharmProjects/PythonProject/PythonProject/techpulse/.venv/Scripts/python.exe\" -B \"C:/Users/USER19/PycharmProjects/PythonProject/PythonProject/techpulse/PythonProject/test_gateway_networks.py\")",
+      "Bash(\"C:/Users/USER19/PycharmProjects/PythonProject/PythonProject/techpulse/.venv/Scripts/python.exe\" -B \"C:/Users/USER19/PycharmProjects/PythonProject/PythonProject/techpulse/PythonProject/smoke_test_ui.py\")"
     ]
   }
 }

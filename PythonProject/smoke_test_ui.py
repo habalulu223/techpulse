@@ -1,21 +1,61 @@
 """Smoke-test that every themed page renders with the calm Techpuls UI assets."""
+import atexit
 import os
-import shutil
 import sys
 import tempfile
+from contextlib import ExitStack
 from unittest.mock import patch
 
 PROJECT = os.path.dirname(os.path.abspath(__file__))
-tmp = tempfile.mkdtemp(prefix='techpuls_ui_test_')
+resources = ExitStack()
+tmp = resources.enter_context(tempfile.TemporaryDirectory(prefix='techpuls_ui_test_'))
+atexit.register(resources.close)
+resources.enter_context(patch.dict(os.environ, {
+    'PYPONDO_DATA_DIR': tmp,
+    'PYPONDO_DB_PATH': os.path.join(tmp, 'pccafe.db'),
+    'PYPONDO_COMMUNITY_DB_PATH': os.path.join(tmp, 'community_equipment.db'),
+    'PYPONDO_AUTH_DB_PATH': os.path.join(tmp, 'auth.db'),
+    'PYPONDO_SECRET_KEY': 'test-secret-key',
+    'LAN_SCAN_ENABLE_NETBIOS': '0',
+    'LAN_SCAN_MAX_HOSTS': '254',
+}))
 
-shutil.copy(os.path.join(PROJECT, 'pccafe.db'), os.path.join(tmp, 'pccafe.db'))
-os.environ['PYPONDO_DB_PATH'] = os.path.join(tmp, 'pccafe.db')
-os.environ['PYPONDO_COMMUNITY_DB_PATH'] = os.path.join(tmp, 'community_equipment.db')
-os.environ['PYPONDO_AUTH_DB_PATH'] = os.path.join(tmp, 'auth.db')
-os.environ['PYPONDO_SECRET_KEY'] = 'test-secret-key'
-
+sys.dont_write_bytecode = True
 sys.path.insert(0, PROJECT)
 import app as app_module  # noqa: E402
+
+# Every UI request, not just the explicit discovery checks, is offline.
+for helper, result in {
+    'parse_ipv4_interfaces': [{'ipv4': '10.88.0.2', 'subnet_mask': '255.255.255.248',
+        'default_gateway': '10.88.0.1'}],
+    'discover_lan_ipv4_neighbors': [],
+    'discover_lan_ipv6_neighbors': [],
+    'ping_ipv4_host': False,
+    'reverse_dns_name': None,
+    'netbios_name': None,
+    'send_lan_command': (True, 'Mock command queued'),
+    'run_cached_network_command': '',
+    'get_default_gateway_ips': [],
+}.items():
+    resources.enter_context(patch.object(app_module, helper, return_value=result))
+resources.enter_context(patch.object(app_module.subprocess, 'Popen',
+    side_effect=AssertionError('UI smoke tests must not run OS commands')))
+resources.enter_context(patch.object(app_module.socket, 'gethostbyaddr',
+    side_effect=AssertionError('UI smoke tests must not perform DNS lookups')))
+resources.enter_context(patch.object(app_module.socket, 'create_connection',
+    side_effect=AssertionError('UI smoke tests must not connect to hosts')))
+resources.enter_context(patch.object(app_module.requests.sessions.Session, 'request',
+    side_effect=AssertionError('UI smoke tests must not send HTTP requests')))
+
+
+def dispose_test_databases():
+    with app_module.app.app_context():
+        app_module.db.session.remove()
+        for engine in app_module.db.engines.values():
+            engine.dispose()
+
+
+resources.callback(dispose_test_databases)
 
 with app_module.app.app_context():
     app_module.initialize_database()
@@ -103,29 +143,37 @@ with app_module.app.app_context():
     dean = app_module.User(username='gateway_dean_test', role='dean')
     dean.set_password('local-test-only')
     app_module.db.session.add(dean)
+    network = app_module.RoomNetwork(room='Test Lab', cidr='10.88.0.0/29', gateway_ip='10.88.0.1')
+    app_module.db.session.add(network)
     app_module.db.session.commit()
     app_module.ensure_auth_database()
+    network_id = network.id
+    summary = app_module.build_saved_ipv4_network_summary(network)
 
-summary = {
-    'cidr': '10.88.0.0/29', 'gateway_ipv4': '10.88.0.1',
-    'local_ipv4': '10.88.0.2', 'subnet_mask': '255.255.255.248',
-}
 scan = {
     'ok': True, 'client_count': 1, 'stale': False,
     'clients': [{'ip': '10.88.0.3', 'mapped_pc_name': 'Gateway Test PC', 'room': 'Test Lab'}],
 }
-with patch.object(app_module, 'build_primary_ipv4_network_summary', return_value=summary), \
-        patch.object(app_module, 'get_gateway_client_scan', return_value=scan) as discovery:
+with patch.object(app_module, 'get_gateway_client_scan', return_value=scan) as discovery:
     page = client.get('/dean/pcs')
-    check('admin sees gateway discovery', page.status_code == 200 and b'Gateway Discovery' in page.data)
+    check('admin sees gateway discovery', page.status_code == 200 and b'Gateway discovery' in page.data)
+    check('admin can select discovered PCs', b'name="selected_ips"' in page.data
+        and b'Save selected PCs' in page.data)
     client.get('/logout')
     client.post('/login', data={'username': 'gateway_dean_test', 'password': 'local-test-only'})
     page = client.get('/dean/pcs')
     check('dean sees gateway and mapped devices', page.status_code == 200
         and b'10.88.0.1' in page.data and b'Gateway Test PC' in page.data and b'Test Lab' in page.data)
-    check('dean discovery is non-blocking', discovery.call_args.kwargs == {'non_blocking': True})
-    check('refresh submits a page request', b'action="/dean/pcs#gateway-discovery"' in page.data
-        and b'<button type="submit">Refresh discovery</button>' in page.data)
+    check('dean discovery is scoped and non-blocking', discovery.call_args.kwargs == {
+        'non_blocking': True, 'summary': summary, 'force': False})
+    check('dean cannot select discovered PCs', b'name="selected_ips"' not in page.data)
+    check('refresh submits a scoped page request', b'action="/dean/pcs#gateway-discovery"' in page.data
+        and b'Refresh discovery</button>' in page.data
+        and f'name="network_id" value="{network_id}"'.encode() in page.data
+        and b'name="refresh" value="1"' in page.data)
+    client.get(f'/dean/pcs?network_id={network_id}&refresh=1')
+    check('refresh forces selected gateway discovery', discovery.call_args.kwargs == {
+        'non_blocking': True, 'summary': summary, 'force': True})
     check('dean cannot use admin-only discovery API', client.get('/api/admin/lan-discovery').status_code == 403)
     discovery.return_value = {'ok': True, 'client_count': 0, 'clients': [], 'stale': True}
     page = client.get('/dean/pcs')
@@ -152,20 +200,22 @@ with patch.object(app_module, 'build_primary_ipv4_network_summary', return_value
     check('students cannot view dean discovery', client.get('/dean/pcs').status_code == 302)
     check('student requests do not start discovery', not discovery.called)
 
-with patch.object(app_module, 'build_primary_ipv4_network_summary', return_value=summary), \
-        patch.object(app_module, 'discover_lan_ipv4_neighbors', return_value=['10.88.0.3']), \
+with patch.object(app_module, 'discover_lan_ipv4_neighbors', return_value=['10.88.0.3']), \
         patch.object(app_module, 'ping_ipv4_host', return_value=False), \
         patch.object(app_module, 'reverse_dns_name', return_value='gateway-test.local'), \
         patch.dict(os.environ, {'LAN_SCAN_ENABLE_NETBIOS': '0'}):
+    key = app_module.gateway_scan_key(summary)
     with app_module.LAN_SCAN_LOCK:
-        app_module.LAN_SCAN_CACHE.update(result=None, scan_in_progress=True)
-    app_module._run_gateway_scan_background()
-    result = app_module.LAN_SCAN_CACHE.get('result')
+        app_module.LAN_SCAN_CACHE[key] = {'timestamp': 0, 'result': None, 'scan_in_progress': True}
+    app_module._run_gateway_scan_background(summary)
+    entry = app_module.LAN_SCAN_CACHE[key]
+    result = entry.get('result')
     check('background discovery has database context', bool(result and result.get('ok')))
     check('background discovery caches resolved devices', bool(result and result.get('clients')
         and result['clients'][0]['source_pc_name'] == 'gateway-test'))
-    check('background discovery clears running state', not app_module.LAN_SCAN_CACHE['scan_in_progress'])
+    check('background discovery clears running state', not entry['scan_in_progress'])
 
+resources.close()
 print()
 if failures:
     print(f'{len(failures)} FAILURE(S): {failures}')

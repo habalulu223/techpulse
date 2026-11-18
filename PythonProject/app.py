@@ -23,7 +23,7 @@ from urllib import request as http_request
 from urllib import error as http_error
 from urllib import parse as http_parse
 from sqlalchemy import event, text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.engine import Engine
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -170,8 +170,11 @@ GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 GOOGLE_USERINFO_ENDPOINT = 'https://openidconnect.googleapis.com/v1/userinfo'
 google_oauth_enabled = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 DEFAULT_LAN_AGENT_TOKEN = "pypondo-lan-token-change-me"
-LAN_SCAN_CACHE = {"timestamp": 0, "cidr": None, "result": None, "scan_in_progress": False}
+LAN_SCAN_CACHE = {}
 LAN_SCAN_LOCK = threading.Lock()
+LAN_SCAN_SLOTS = threading.BoundedSemaphore(2)
+PC_REGISTRATION_LOCK = threading.Lock()
+PRIVATE_LAN_NETWORKS = tuple(ipaddress.IPv4Network(cidr) for cidr in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'))
 NETWORK_CMD_CACHE = {}
 NETWORK_CMD_CACHE_LOCK = threading.Lock()
 HOSTNAME_CACHE = {}
@@ -1043,6 +1046,33 @@ def current_staff_or_redirect():
     return True
 
 
+@app.template_global()
+def network_csrf_token():
+    if '_network_csrf_token' not in session:
+        session['_network_csrf_token'] = secrets.token_urlsafe(32)
+    return session['_network_csrf_token']
+
+
+def require_network_csrf():
+    expected = session.get('_network_csrf_token', '')
+    submitted = request.form.get('csrf_token', '')
+    if not expected or not secrets.compare_digest(expected.encode(), submitted.encode()):
+        abort(400, description='Invalid form token. Reload the page and try again.')
+
+
+def validate_gateway_network(cidr, gateway_ip):
+    try:
+        network = ipaddress.IPv4Network(cidr, strict=False)
+        gateway = ipaddress.IPv4Address(gateway_ip)
+    except ValueError:
+        raise ValueError('Enter a valid IPv4 subnet and gateway address.') from None
+    if not any(network.subnet_of(private) for private in PRIVATE_LAN_NETWORKS):
+        raise ValueError('Use a private campus LAN subnet.')
+    if network.prefixlen > 30 or gateway not in network or gateway in {network.network_address, network.broadcast_address}:
+        raise ValueError('The gateway must be a usable address inside the subnet.')
+    return network, str(gateway)
+
+
 def room_for_ip(value):
     ip = normalize_ipv4(value or "")
     if not ip:
@@ -1840,19 +1870,70 @@ def short_host_name(value):
     return str(value).split(".", 1)[0].strip() or None
 
 
+def get_saved_room_network(value):
+    try:
+        network_id = int(value)
+    except (TypeError, ValueError):
+        abort(400, description='Select a saved gateway.')
+    room_network = db.session.get(RoomNetwork, network_id)
+    if room_network is None:
+        abort(404, description='The selected gateway does not exist.')
+    return room_network
+
+
+def build_saved_ipv4_network_summary(room_network):
+    network, gateway = validate_gateway_network(room_network.cidr, room_network.gateway_ip or '')
+    for other in RoomNetwork.query.filter(RoomNetwork.id != room_network.id).all():
+        try:
+            other_network = ipaddress.IPv4Network(other.cidr, strict=False)
+        except ValueError:
+            continue
+        if network.overlaps(other_network):
+            raise ValueError('This saved subnet overlaps another room network; ask an administrator to correct the mappings.')
+    interfaces = parse_ipv4_interfaces()
+    local_ips = [iface['ipv4'] for iface in interfaces if normalize_ipv4(iface.get('ipv4', ''))]
+    local_ip = next((ip for ip in local_ips if ipaddress.IPv4Address(ip) in network), None)
+    return {
+        'network_id': room_network.id,
+        'room': room_network.room,
+        'cidr': str(network),
+        'gateway_ipv4': gateway,
+        'local_ipv4': local_ip,
+        'local_ipv4_addresses': local_ips,
+        'subnet_mask': str(network.netmask),
+    }
+
+
+def is_network_client_ip(value, summary):
+    ip = normalize_ipv4(value or '')
+    if not ip:
+        return False
+    address = ipaddress.IPv4Address(ip)
+    network = ipaddress.IPv4Network(summary['cidr'], strict=False)
+    excluded = set(summary.get('local_ipv4_addresses', [])) | {summary.get('local_ipv4'), summary.get('gateway_ipv4')}
+    return address in network and address not in {network.network_address, network.broadcast_address} and ip not in excluded
+
+
+def gateway_scan_key(summary):
+    return (summary.get('network_id'), summary['cidr'], summary.get('gateway_ipv4'),
+        summary.get('local_ipv4'), tuple(sorted(summary.get('local_ipv4_addresses', []))))
+
+
 def _quick_gateway_scan_result(summary):
     gateway_ip = summary.get("gateway_ipv4")
     local_ip = summary.get("local_ipv4")
 
     clients = []
+    mapped_pc_by_ip = {pc.lan_ip: pc.name for pc in PC.query.filter(PC.lan_ip.isnot(None)).all()}
     for ip in discover_lan_ipv4_neighbors():
-        if ip in {gateway_ip, local_ip}:
+        if not is_network_client_ip(ip, summary):
             continue
         clients.append({
             "ip": ip,
             "hostname": "unknown",
             "source_pc_name": "unknown",
-            "room": room_for_ip(ip)
+            "mapped_pc_name": mapped_pc_by_ip.get(ip),
+            "room": summary.get('room') or room_for_ip(ip)
         })
 
     clients = sorted(clients, key=lambda row: tuple(int(part) for part in row["ip"].split(".")))
@@ -1879,16 +1960,14 @@ def _full_gateway_scan(summary):
     gateway_ip = summary.get("gateway_ipv4")
     local_ip = summary.get("local_ipv4")
 
-    host_pool = [str(ip) for ip in network.hosts()]
-    if local_ip in host_pool:
-        host_pool.remove(local_ip)
-    if gateway_ip in host_pool:
-        host_pool.remove(gateway_ip)
-
-    if len(host_pool) > max_hosts:
+    excluded = set(summary.get('local_ipv4_addresses', [])) | {local_ip, gateway_ip}
+    excluded_count = sum(bool(ip and ipaddress.IPv4Address(ip) in network
+        and ipaddress.IPv4Address(ip) not in {network.network_address, network.broadcast_address}) for ip in excluded)
+    host_count = max(0, network.num_addresses - 2 - excluded_count)
+    if host_count > max_hosts:
         result = {
             "ok": False,
-            "error": f"network too large to scan safely ({len(host_pool)} hosts, max {max_hosts})",
+            "error": f"network too large to scan safely ({host_count} hosts, max {max_hosts})",
             "network": summary["cidr"],
             "gateway_ipv4": gateway_ip,
             "clients": [],
@@ -1897,7 +1976,8 @@ def _full_gateway_scan(summary):
         }
         return result
 
-    active_ips = set(discover_lan_ipv4_neighbors())
+    host_pool = [str(ip) for ip in network.hosts() if is_network_client_ip(str(ip), summary)]
+    active_ips = {ip for ip in discover_lan_ipv4_neighbors() if is_network_client_ip(ip, summary)}
     with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
         futures = {executor.submit(ping_ipv4_host, ip, timeout_ms): ip for ip in host_pool}
         for future in as_completed(futures):
@@ -1945,7 +2025,7 @@ def _full_gateway_scan(summary):
             "source_pc_name": source_pc_name,
             "device_name": source_pc_name,
             "mapped_pc_name": mapped_pc_by_ip.get(ip),
-            "room": room_for_ip(ip)
+            "room": summary.get('room') or room_for_ip(ip)
         })
 
     return {
@@ -1960,65 +2040,70 @@ def _full_gateway_scan(summary):
     }
 
 
-def _store_gateway_scan_cache(cidr, result):
+def _store_gateway_scan_cache(summary, result):
     with LAN_SCAN_LOCK:
-        LAN_SCAN_CACHE["timestamp"] = time.time()
-        LAN_SCAN_CACHE["cidr"] = cidr
-        LAN_SCAN_CACHE["result"] = result
-        LAN_SCAN_CACHE["scan_in_progress"] = False
+        LAN_SCAN_CACHE[gateway_scan_key(summary)] = {
+            'timestamp': time.time(), 'result': result, 'scan_in_progress': False,
+        }
 
 
-def _run_gateway_scan_background():
-    summary = build_primary_ipv4_network_summary()
-    if not summary:
-        with LAN_SCAN_LOCK:
-            LAN_SCAN_CACHE["scan_in_progress"] = False
-        return
+def _run_gateway_scan_background(summary):
     try:
         with app.app_context():
             result = _full_gateway_scan(summary)
-        _store_gateway_scan_cache(summary["cidr"], result)
     except Exception:
-        with LAN_SCAN_LOCK:
-            LAN_SCAN_CACHE["scan_in_progress"] = False
+        app.logger.exception('Gateway discovery failed for %s', summary['cidr'])
+        result = {'ok': False, 'error': 'discovery failed; refresh to try again', 'clients': [], 'stale': False}
+    _store_gateway_scan_cache(summary, result)
 
 
-def _trigger_gateway_scan_background():
+def _trigger_gateway_scan_background(summary):
+    key = gateway_scan_key(summary)
     with LAN_SCAN_LOCK:
-        if LAN_SCAN_CACHE.get("scan_in_progress"):
+        entry = LAN_SCAN_CACHE.setdefault(key, {})
+        if entry.get('scan_in_progress') or not LAN_SCAN_SLOTS.acquire(blocking=False):
             return
-        LAN_SCAN_CACHE["scan_in_progress"] = True
-    threading.Thread(target=_run_gateway_scan_background, daemon=True).start()
+        entry['scan_in_progress'] = True
+
+    def scan():
+        try:
+            _run_gateway_scan_background(summary)
+        finally:
+            LAN_SCAN_SLOTS.release()
+
+    threading.Thread(target=scan, daemon=True).start()
 
 
-def get_gateway_client_scan(force=False, non_blocking=False):
-    summary = build_primary_ipv4_network_summary()
+def get_gateway_client_scan(force=False, non_blocking=False, summary=None):
+    if summary is None:
+        summary = build_primary_ipv4_network_summary()
     if not summary:
         return {"ok": False, "error": "no active IPv4 router network detected", "clients": []}
 
+    key = gateway_scan_key(summary)
     ttl = int(os.getenv("LAN_SCAN_TTL_SECONDS", "45"))
     now = time.time()
     with LAN_SCAN_LOCK:
-        cached = LAN_SCAN_CACHE.get("result")
-        cached_cidr = LAN_SCAN_CACHE.get("cidr")
-        cached_age = now - float(LAN_SCAN_CACHE.get("timestamp", 0))
+        entry = LAN_SCAN_CACHE.get(key, {})
+        cached = entry.get('result')
+        cached_age = now - float(entry.get('timestamp', 0))
 
-    if not force and cached is not None and cached_cidr == summary["cidr"] and cached_age < ttl:
+    if not force and cached is not None and cached_age < ttl and not cached.get('stale'):
         return cached
 
     if non_blocking:
-        _trigger_gateway_scan_background()
-        if cached is not None and cached_cidr == summary["cidr"]:
-            if isinstance(cached, dict):
-                stale_cached = dict(cached)
-                stale_cached["stale"] = True
-                stale_cached["mode"] = stale_cached.get("mode", "cache")
-                return stale_cached
-            return cached
-        return _quick_gateway_scan_result(summary)
+        if cached is None:
+            quick_result = _quick_gateway_scan_result(summary)
+            with LAN_SCAN_LOCK:
+                entry = LAN_SCAN_CACHE.setdefault(key, {})
+                if entry.get('result') is None:
+                    entry.update(timestamp=time.time(), result=quick_result)
+                cached = entry['result']
+        _trigger_gateway_scan_background(summary)
+        return dict(cached, stale=True)
 
     result = _full_gateway_scan(summary)
-    _store_gateway_scan_cache(summary["cidr"], result)
+    _store_gateway_scan_cache(summary, result)
     return result
 
 
@@ -4842,7 +4927,20 @@ def decline_loan_request(request_id):
 @login_required
 def dean_dashboard():
     if not (current_user.is_dean or current_user.is_admin): return redirect(url_for('index'))
-    pcs = PC.query.order_by(PC.room, PC.name).all()
+    room_networks = RoomNetwork.query.order_by(RoomNetwork.room, RoomNetwork.id).all()
+    selected_network = get_saved_room_network(request.args['network_id']) if 'network_id' in request.args else next(iter(room_networks), None)
+    lan_summary, gateway_scan = None, None
+    if selected_network:
+        try:
+            lan_summary = build_saved_ipv4_network_summary(selected_network)
+        except ValueError as error:
+            gateway_scan = {'ok': False, 'error': str(error), 'clients': []}
+        else:
+            gateway_scan = get_gateway_client_scan(non_blocking=True, summary=lan_summary,
+                force=request.args.get('refresh') == '1')
+    all_pcs = PC.query.order_by(PC.room, PC.name).all()
+    pcs = [pc for pc in all_pcs if lan_summary and is_network_client_ip(pc.lan_ip, lan_summary)]
+    saved_pc_ips = {pc.lan_ip for pc in all_pcs if pc.lan_ip}
     online_window_seconds = get_agent_online_window_seconds()
     now_dt = datetime.now()
     active_pc_ids = {session.pc_id for session in Session.query.filter_by(end_time=None).all()}
@@ -4853,9 +4951,9 @@ def dean_dashboard():
         {"label": "In use", "value": sum(pc.id in in_use_pc_ids for pc in pcs), "color": "#ff7184"},
         {"label": "Online", "value": sum(pc.id in online_pc_ids for pc in pcs), "color": "#58a8ff"},
     ]
-    gateway_scan = get_gateway_client_scan(non_blocking=True)
     return render_template('dean.html', pcs=pcs, pc_status_chart=pc_status_chart,
-        lan_summary=build_primary_ipv4_network_summary(), gateway_scan=gateway_scan)
+        room_networks=room_networks, selected_network=selected_network, saved_pc_ips=saved_pc_ips,
+        lan_summary=lan_summary, gateway_scan=gateway_scan)
 
 
 @app.route('/dean/analytics')
@@ -4874,10 +4972,7 @@ def dean_analytics():
     borrowed_equipment = sum(status == 'Borrowed' for status in equipment_status.values())
     borrowings_total = CommunityBorrowing.query.count()
     pending_borrowings = CommunityBorrowing.query.filter_by(borrowing_status='Pending').count()
-    active_borrowings = CommunityBorrowing.query.filter(
-        CommunityBorrowing.borrowing_status.in_(['Borrowed', 'Return Requested'])).count()
     overdue_borrowings = CommunityBorrowing.query.filter_by(borrowing_status='Overdue').count()
-    returned_borrowings = CommunityBorrowing.query.filter_by(borrowing_status='Returned').count()
     today_borrowings = CommunityBorrowing.query.filter(CommunityBorrowing.borrow_date >= today_start).count()
     recent_borrowings = CommunityBorrowing.query.order_by(
         CommunityBorrowing.borrow_date.desc()).limit(8).all()
@@ -4900,8 +4995,7 @@ def dean_analytics():
         users_total=users_total, equipment_total=equipment_total,
         available_equipment=available_equipment, borrowed_equipment=borrowed_equipment,
         borrowings_total=borrowings_total, pending_borrowings=pending_borrowings,
-        active_borrowings=active_borrowings, overdue_borrowings=overdue_borrowings,
-        returned_borrowings=returned_borrowings, today_borrowings=today_borrowings,
+        overdue_borrowings=overdue_borrowings, today_borrowings=today_borrowings,
         recent_borrowings=recent_borrowings,
         monthly_labels=monthly_labels, monthly_values=monthly_values)
 
@@ -4909,14 +5003,21 @@ def dean_analytics():
 @app.route('/dean/pc-command', methods=['POST'])
 @login_required
 def dean_pc_command():
-    if not (current_user.is_dean or current_user.is_admin): return redirect(url_for('index'))
-    pc = db.session.get(PC, request.form.get('pc_id', type=int)); command = str(request.form.get('command', '')).lower()
-    if not pc or command not in ALLOWED_LAN_COMMANDS:
-        flash('Invalid PC or command.', 'error'); return redirect(url_for('dean_dashboard'))
+    if not (current_user.is_dean or current_user.is_admin): abort(403)
+    require_network_csrf()
+    room_network = get_saved_room_network(request.form.get('network_id'))
+    try:
+        summary = build_saved_ipv4_network_summary(room_network)
+    except ValueError as error:
+        abort(400, description=str(error))
+    pc = db.session.get(PC, request.form.get('pc_id', type=int))
+    command = str(request.form.get('command', '')).lower()
+    if not pc or not is_network_client_ip(pc.lan_ip, summary) or command not in ALLOWED_LAN_COMMANDS:
+        abort(400, description='Select a registered PC and valid command for this gateway.')
     ok, message = send_lan_command(pc.name, command, {'requested_by': current_user.username, 'reason': 'Dean remote control'})
     db.session.add(AdminLog(admin_name=current_user.username, action=f'Dean LAN command {command} to {pc.name}: {message}'))
     db.session.commit(); flash(message, 'success' if ok else 'error')
-    return redirect(url_for('dean_dashboard'))
+    return redirect(url_for('dean_dashboard', network_id=room_network.id))
 
 
 @app.route('/equipment/report.csv')
@@ -5056,18 +5157,87 @@ def create_staff_account():
 @app.route('/rooms/network', methods=['POST'])
 @login_required
 def add_room_network():
-    if not current_user.is_management:
-        flash('Only IT technicians or administrators can manage room networks.', 'error'); return redirect(url_for('equipment_dashboard'))
-    room, cidr = str(request.form.get('room', '')).strip(), str(request.form.get('cidr', '')).strip()
-    try: ipaddress.ip_network(cidr, strict=False)
-    except ValueError: cidr = ''
-    if not room or not cidr or RoomNetwork.query.filter((RoomNetwork.room == room) | (RoomNetwork.cidr == cidr)).first():
-        flash('Use a unique room and valid, unique router subnet (for example 192.168.10.0/24).', 'error')
-    else:
-        db.session.add(RoomNetwork(room=room, cidr=cidr, gateway_ip=str(request.form.get('gateway_ip', '')).strip() or None,
-            router_name=str(request.form.get('router_name', '')).strip() or None))
-        db.session.commit(); flash('Room-router mapping saved.', 'success')
-    return redirect(url_for('equipment_dashboard'))
+    if not current_user.is_admin:
+        abort(403)
+    require_network_csrf()
+    room = request.form.get('room', '').strip()
+    cidr = request.form.get('cidr', '').strip()
+    gateway_ip = request.form.get('gateway_ip', '').strip()
+    router_name = request.form.get('router_name', '').strip()
+    try:
+        if not room or len(room) > 80 or len(cidr) > 64 or len(gateway_ip) > 64 or len(router_name) > 120:
+            raise ValueError('Enter a room name (up to 80 characters) and valid gateway details.')
+        network, gateway_ip = validate_gateway_network(cidr, gateway_ip)
+        for existing in RoomNetwork.query.all():
+            if existing.room == room:
+                raise ValueError('A gateway is already saved for this room.')
+            try:
+                existing_subnet = ipaddress.IPv4Network(existing.cidr, strict=False)
+            except ValueError:
+                continue
+            if network.overlaps(existing_subnet):
+                raise ValueError('This subnet duplicates or overlaps an existing room network.')
+    except ValueError as error:
+        flash(str(error), 'error')
+        return redirect(url_for('dean_dashboard'))
+    room_network = RoomNetwork(room=room, cidr=str(network), gateway_ip=gateway_ip, router_name=router_name or None)
+    db.session.add(room_network)
+    db.session.add(AdminLog(admin_name=current_user.username, action=f'Added gateway {gateway_ip} ({network}) for {room}'))
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        abort(409, description='A matching gateway was already saved. Reload the page.')
+    flash('Gateway saved.', 'success')
+    return redirect(url_for('dean_dashboard', network_id=room_network.id))
+
+
+@app.route('/admin/pcs/save-discovered', methods=['POST'])
+@login_required
+def save_discovered_pcs():
+    if not current_user.is_admin:
+        abort(403)
+    require_network_csrf()
+    room_network = get_saved_room_network(request.form.get('network_id'))
+    selected_ips = set(request.form.getlist('selected_ips'))
+    if not selected_ips:
+        flash('Select at least one discovered PC to save.', 'info')
+        return redirect(url_for('dean_dashboard', network_id=room_network.id))
+    try:
+        summary = build_saved_ipv4_network_summary(room_network)
+    except ValueError as error:
+        abort(400, description=str(error))
+    with LAN_SCAN_LOCK:
+        entry = LAN_SCAN_CACHE.get(gateway_scan_key(summary), {})
+        scan = entry.get('result') or {}
+        age = time.time() - float(entry.get('timestamp', 0))
+    if not scan.get('ok') or age >= int(os.getenv('LAN_SCAN_TTL_SECONDS', '45')):
+        abort(409, description='Discovery has expired or is unavailable. Refresh discovery before saving PCs.')
+    discovered = {host['ip']: host for host in scan.get('clients', []) if is_network_client_ip(host.get('ip'), summary)}
+    if not selected_ips.issubset(discovered):
+        abort(400, description='Only devices discovered on the selected gateway can be saved.')
+    saved_count = 0
+    with PC_REGISTRATION_LOCK:
+        try:
+            for ip in sorted(selected_ips, key=ipaddress.IPv4Address):
+                if PC.query.filter_by(lan_ip=ip).first():
+                    continue
+                host = discovered[ip]
+                raw_name = host.get('source_pc_name') or short_host_name(host.get('hostname'))
+                if not raw_name or raw_name.lower() == 'unknown':
+                    raw_name = f"PC-{ip.replace('.', '-')}"
+                pc = PC(name=build_unique_agent_pc_name(raw_name), lan_ip=ip,
+                    lan_port=normalize_agent_port(os.getenv('LAN_AGENT_DEFAULT_PORT', '5001')), room=room_network.room)
+                db.session.add(pc)
+                db.session.flush()
+                db.session.add(AdminLog(admin_name=current_user.username, action=f'Saved PC {pc.name} at {ip} for gateway {summary["gateway_ipv4"]}'))
+                saved_count += 1
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            abort(409, description='A PC was saved concurrently. Refresh the page and try again.')
+    flash(f'Saved {saved_count} PC(s).' if saved_count else 'The selected PCs are already saved.', 'success')
+    return redirect(url_for('dean_dashboard', network_id=room_network.id))
 
 
 @app.route('/admin/public_route/start', methods=['POST'])
@@ -5711,40 +5881,48 @@ def api_agent_register_lan():
     if provided_token != shared_token:
         return jsonify({"ok": False, "error": "unauthorized"}), 401
 
-    data = request.get_json(silent=True) or {}
-    pc_name = str(data.get("pc_name", "")).strip()
-    if not pc_name:
-        return jsonify({"ok": False, "error": "pc_name is required"}), 400
-
-    pc = PC.query.filter_by(name=pc_name).first()
-    if not pc:
-        # Auto-create an unmapped PC record for first-time client hostnames.
-        created_name = build_unique_agent_pc_name(pc_name)
-        pc = PC(name=created_name)
-        db.session.add(pc)
-        db.session.flush()
-        db.session.add(AdminLog(
-            admin_name=f"agent:{pc_name}",
-            action=f"Auto-created PC record '{created_name}' from agent identity '{pc_name}'"
-        ))
-
-    body_ip = normalize_lan_ip(str(data.get("lan_ip", "")).strip()) if data.get("lan_ip") else None
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'ok': False, 'error': 'a JSON object is required'}), 400
+    raw_name = data.get('pc_name')
+    if not isinstance(raw_name, str) or not raw_name.strip() or len(raw_name.strip()) > 255:
+        return jsonify({'ok': False, 'error': 'a valid pc_name is required'}), 400
+    pc_name = raw_name.strip()
+    body_ip = None
+    if 'lan_ip' in data:
+        if not isinstance(data['lan_ip'], str):
+            return jsonify({'ok': False, 'error': 'invalid LAN IP'}), 400
+        body_ip = normalize_lan_ip(data['lan_ip'])
+        if not body_ip:
+            return jsonify({'ok': False, 'error': 'invalid LAN IP'}), 400
     detected_ip = body_ip or get_client_ip_from_request()
     if not detected_ip:
-        return jsonify({"ok": False, "error": "unable to determine LAN IP"}), 400
-    if ":" not in detected_ip and detected_ip in get_gateway_ipv4_set():
-        return jsonify({"ok": False, "error": "gateway IP cannot be assigned to a PC"}), 400
-    agent_port = normalize_agent_port(data.get("agent_port", os.getenv("LAN_AGENT_DEFAULT_PORT", "5001")))
+        return jsonify({'ok': False, 'error': 'unable to determine LAN IP'}), 400
+    room_networks = RoomNetwork.query.all()
+    gateway_ips = get_gateway_ipv4_set() | {network.gateway_ip for network in room_networks if network.gateway_ip}
+    if ':' not in detected_ip and detected_ip in gateway_ips:
+        return jsonify({'ok': False, 'error': 'gateway IP cannot be assigned to a PC'}), 400
+    agent_port = normalize_agent_port(data.get('agent_port', os.getenv('LAN_AGENT_DEFAULT_PORT', '5001')))
     if not agent_port:
-        return jsonify({"ok": False, "error": "invalid agent_port"}), 400
+        return jsonify({'ok': False, 'error': 'invalid agent_port'}), 400
 
-    in_use = PC.query.filter(PC.id != pc.id, PC.lan_ip == detected_ip).first()
-    if in_use:
-        return jsonify({
-            "ok": False,
-            "error": f"IP already assigned to {in_use.name}",
-            "lan_ip": detected_ip
-        }), 409
+    named_pc = PC.query.filter_by(name=pc_name).first()
+    ip_matches = PC.query.filter_by(lan_ip=detected_ip).all()
+    if len(ip_matches) > 1 or (named_pc and ip_matches and ip_matches[0].id != named_pc.id):
+        return jsonify({'ok': False, 'error': 'PC identity conflicts with an existing IP assignment'}), 409
+    pc = named_pc or next(iter(ip_matches), None)
+    if pc is None:
+        return jsonify({'ok': False, 'error': 'admin approval required; save this PC from gateway discovery first'}), 403
+    previous_ip = normalize_ipv4(pc.lan_ip or '')
+    if previous_ip:
+        for room_network in room_networks:
+            try:
+                subnet = ipaddress.IPv4Network(room_network.cidr, strict=False)
+            except ValueError:
+                continue
+            if ipaddress.IPv4Address(previous_ip) in subnet and not is_network_client_ip(detected_ip,
+                    {'cidr': str(subnet), 'gateway_ipv4': room_network.gateway_ip}):
+                return jsonify({'ok': False, 'error': 'admin approval required to move this PC to another network'}), 403
 
     pc.lan_ip = detected_ip
     pc.lan_port = agent_port

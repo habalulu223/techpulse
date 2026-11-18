@@ -82,6 +82,26 @@ header h1 { margin: 0 0 5px; font-size: 1.5rem; }
 .gateway-table-scroll { max-width: 100%; overflow-x: auto; }
 .gateway-table-scroll table { width: 100%; border-collapse: collapse; text-align: left; }
 .gateway-table-scroll th, .gateway-table-scroll td { padding: 10px; overflow-wrap: anywhere; }
+main .gateway-selector { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+.gateway-field { display: grid; gap: 6px; min-width: 0; }
+.gateway-selector .gateway-field { flex: 1 1 280px; }
+.gateway-field label { font-weight: 600; }
+.gateway-field input, .gateway-field select { min-width: 0; max-width: 100%; }
+.gateway-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.gateway-admin { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--tp-line); }
+.gateway-admin > summary { cursor: pointer; font-weight: 600; }
+.gateway-admin[open] > summary { margin-bottom: 12px; }
+.gateway-settings, .gateway-discovery { min-width: 0; overflow-wrap: anywhere; }
+.gateway-discovery .gateway-table-scroll { margin-bottom: 12px; }
+.gateway-pc-select { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; cursor: pointer; white-space: nowrap; }
+.gateway-pc-select input[type="checkbox"] { width: 18px; height: 18px; margin: 0; flex: 0 0 auto; accent-color: var(--tp-accent); }
+.gateway-save-form { justify-items: start; }
+@media (max-width: 760px) {
+  .gateway-fields { grid-template-columns: minmax(0, 1fr); }
+  .gateway-selector .gateway-field, .gateway-selector > button { flex-basis: 100%; }
+  .gateway-heading > div { min-width: 0; }
+  .gateway-heading > form, .gateway-save-form > button { width: 100%; }
+}
 @media (max-width: 700px) {
   header { align-items: flex-start; flex-wrap: wrap; }
   .dean-head-actions { justify-content: flex-start; }

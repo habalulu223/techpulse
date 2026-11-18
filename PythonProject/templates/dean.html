@@ -3,25 +3,74 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dean PC Monitor</title>
+  <title>PC Lab</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dean.css') }}">
   {% include '_dashboard_container_theme.html' %}
 </head>
 <body>
   {% include '_dashboard_nav.html' %}
-  {% set header_title = 'Dean PC Monitoring' %}
+  {% set header_title = 'PC Lab' %}
   {% set header_subtitle = 'Remote actions are delivered only to registered campus LAN agents.' %}
   {% include '_app_header.html' %}
   <main>
     {% with messages = get_flashed_messages() %}
       {% for message in messages %}<p class="flash">{{ message }}</p>{% endfor %}
     {% endwith %}
+    <section class="panel gateway-settings" aria-labelledby="saved-gateways-heading">
+      <h2 id="saved-gateways-heading">Saved gateways</h2>
+      {% if room_networks %}
+        <p id="gateway-filter-help" class="muted">Filter discovery, saved PCs, and statistics by a saved network. This selection does not change the server's operating system routing.</p>
+        <form class="gateway-selector" method="get" action="{{ url_for('dean_dashboard') }}">
+          <div class="gateway-field">
+            <label for="network-id">Gateway network filter</label>
+            <select id="network-id" name="network_id" aria-describedby="gateway-filter-help" required>
+              {% if not selected_network %}<option value="" selected disabled>Select a saved gateway</option>{% endif %}
+              {% for network in room_networks %}
+                <option value="{{ network.id }}"{% if selected_network and selected_network.id == network.id %} selected{% endif %}>{{ network.room }} — {{ network.gateway_ip }} — {{ network.cidr }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit">Use gateway</button>
+        </form>
+        {% if not selected_network %}<p class="muted">Select a saved gateway to view its network and PCs.</p>{% endif %}
+      {% else %}
+        <p class="muted">No gateways have been saved. An administrator must add a gateway and its room subnet before discovery and network filtering are available.</p>
+      {% endif %}
+      {% if current_user.is_admin %}
+        <details class="gateway-admin"{% if not room_networks %} open{% endif %}>
+          <summary>Add a gateway</summary>
+          <p id="gateway-add-help" class="muted">Save a campus room's gateway and IPv4 subnet for discovery. Required fields are labelled; adding a gateway does not save PCs or send commands.</p>
+          <form method="post" action="{{ url_for('add_room_network') }}" aria-describedby="gateway-add-help">
+            <input type="hidden" name="csrf_token" value="{{ network_csrf_token() }}">
+            <div class="gateway-fields">
+              <div class="gateway-field">
+                <label for="gateway-room">Room (required, e.g. IT Lab 1)</label>
+                <input id="gateway-room" name="room" maxlength="80" required>
+              </div>
+              <div class="gateway-field">
+                <label for="gateway-ip">Gateway IPv4 address (required, e.g. 192.168.10.1)</label>
+                <input id="gateway-ip" name="gateway_ip" maxlength="64" required>
+              </div>
+              <div class="gateway-field">
+                <label for="gateway-cidr">IPv4 subnet / CIDR (required, e.g. 192.168.10.0/24)</label>
+                <input id="gateway-cidr" name="cidr" maxlength="64" required>
+              </div>
+              <div class="gateway-field">
+                <label for="gateway-router-name">Router name (optional)</label>
+                <input id="gateway-router-name" name="router_name" maxlength="120">
+              </div>
+            </div>
+            <div><button type="submit">Save gateway</button></div>
+          </form>
+        </details>
+      {% endif %}
+    </section>
     <section class="status-chart" aria-label="PC status graph">
       <div class="status-chart-heading">
         <div>
-          <h2>Campus PC Overview</h2>
-          <p class="muted">Live availability and agent status</p>
+          <h2>Saved PC overview</h2>
+          <p class="muted">Live availability and agent status{% if selected_network %} for {{ selected_network.room }} ({{ selected_network.cidr }}){% endif %}</p>
         </div>
         <strong>{{ pcs|length }} PCs</strong>
       </div>
@@ -37,51 +86,82 @@
         {% endfor %}
       </div>
     </section>
-    <section id="gateway-discovery" class="panel gateway-discovery" aria-labelledby="gateway-heading">
-      <div class="gateway-heading">
-        <div>
-          <h2 id="gateway-heading">Gateway Discovery</h2>
-          <p class="muted">Discover devices on the server's campus LAN.</p>
-        </div>
-        <form method="get" action="{{ url_for('dean_dashboard') }}#gateway-discovery">
-          <button type="submit">Refresh discovery</button>
-        </form>
-      </div>
-      {% if lan_summary %}
-        <dl class="gateway-summary">
-          <div><dt>Gateway IP</dt><dd>{{ lan_summary.gateway_ipv4 or 'Not available' }}</dd></div>
-          <div><dt>Server IP</dt><dd>{{ lan_summary.local_ipv4 or 'Not available' }}</dd></div>
-          <div><dt>Network</dt><dd>{{ lan_summary.cidr }}</dd></div>
-          <div><dt>Subnet mask</dt><dd>{{ lan_summary.subnet_mask or 'Not available' }}</dd></div>
-        </dl>
-      {% endif %}
-      {% if gateway_scan.ok %}
-        <p class="muted" role="status">
-          Detected clients: {{ gateway_scan.client_count }}.
-          {% if gateway_scan.stale %}Discovery is running in the background. Refresh to see the latest results.{% endif %}
-        </p>
-        {% if gateway_scan.clients %}
-          <div class="gateway-table-scroll" tabindex="0" role="region" aria-label="Discovered LAN devices">
-            <table>
-              <thead><tr><th scope="col">IP address</th><th scope="col">Device / PC</th><th scope="col">Room</th></tr></thead>
-              <tbody>
-                {% for host in gateway_scan.clients %}
-                  <tr>
-                    <td>{{ host.ip }}</td>
-                    <td>{{ host.mapped_pc_name or host.source_pc_name or host.hostname or 'Unknown device' }}</td>
-                    <td>{{ host.room or 'Not mapped' }}</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+    {% if room_networks and selected_network %}
+      <section id="gateway-discovery" class="panel gateway-discovery" aria-labelledby="gateway-heading">
+        <div class="gateway-heading">
+          <div>
+            <h2 id="gateway-heading">Gateway discovery</h2>
+            <p class="muted">Devices on {{ selected_network.room }} — {{ selected_network.gateway_ip }} — {{ selected_network.cidr }}.</p>
           </div>
-        {% else %}
-          <p class="muted">No client devices have been detected on this subnet yet.</p>
+          <form method="get" action="{{ url_for('dean_dashboard') }}#gateway-discovery">
+            <input type="hidden" name="network_id" value="{{ selected_network.id }}">
+            <input type="hidden" name="refresh" value="1">
+            <button type="submit" class="btn-secondary">Refresh discovery</button>
+          </form>
+        </div>
+        {% if lan_summary %}
+          <dl class="gateway-summary">
+            <div><dt>Gateway IP</dt><dd>{{ lan_summary.gateway_ipv4 or 'Not available' }}</dd></div>
+            <div><dt>Server IP</dt><dd>{{ lan_summary.local_ipv4 or 'Not available' }}</dd></div>
+            <div><dt>Network</dt><dd>{{ lan_summary.cidr }}</dd></div>
+            <div><dt>Subnet mask</dt><dd>{{ lan_summary.subnet_mask or 'Not available' }}</dd></div>
+          </dl>
         {% endif %}
-      {% else %}
-        <p class="muted" role="status">Gateway discovery unavailable: {{ gateway_scan.error }}. Check the server's LAN connection and refresh.</p>
-      {% endif %}
-    </section>
+        {% if gateway_scan and gateway_scan.ok %}
+          <p class="muted" role="status">
+            Detected clients: {{ gateway_scan.client_count }}.
+            {% if gateway_scan.stale %}Discovery is running in the background. Refresh to see the latest results.{% endif %}
+          </p>
+          {% if gateway_scan.clients %}
+            {% set unsaved_hosts = gateway_scan.clients|rejectattr('ip', 'in', saved_pc_ips)|list %}
+            <div class="table-scroll gateway-table-scroll" tabindex="0" role="region" aria-label="Discovered LAN devices">
+              <table>
+                <thead><tr><th scope="col">IP address</th><th scope="col">Device / PC</th><th scope="col">Room</th><th scope="col">Registration</th></tr></thead>
+                <tbody>
+                  {% for host in gateway_scan.clients %}
+                    <tr>
+                      <td>{{ host.ip }}</td>
+                      <td>{{ host.mapped_pc_name or host.source_pc_name or host.hostname or 'Unknown device' }}</td>
+                      <td>{{ host.room or 'Not mapped' }}</td>
+                      <td>
+                        {% if host.ip in saved_pc_ips %}
+                          <span class="badge status-ok">Saved</span>
+                        {% elif current_user.is_admin %}
+                          <label class="gateway-pc-select">
+                            <input type="checkbox" name="selected_ips" value="{{ host.ip }}" form="save-discovered-pcs" aria-label="Select PC at {{ host.ip }}">
+                            <span>Select PC</span>
+                          </label>
+                        {% else %}
+                          <span class="badge">Not saved</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% if current_user.is_admin and unsaved_hosts %}
+              <form id="save-discovered-pcs" class="gateway-save-form" method="post" action="{{ url_for('save_discovered_pcs') }}" aria-describedby="gateway-save-help">
+                <input type="hidden" name="network_id" value="{{ selected_network.id }}">
+                <input type="hidden" name="csrf_token" value="{{ network_csrf_token() }}">
+                <p id="gateway-save-help" class="muted">Select only PCs you want to register. Saving records the selected PCs; it does not connect to them or send commands.</p>
+                <button type="submit">Save selected PCs</button>
+              </form>
+            {% elif not unsaved_hosts %}
+              <p class="muted">All discovered devices are already saved.</p>
+            {% else %}
+              <p class="muted">Only an administrator can select and save discovered PCs.</p>
+            {% endif %}
+          {% else %}
+            <p class="muted">No client devices have been detected on this subnet yet.</p>
+          {% endif %}
+        {% elif gateway_scan %}
+          <p class="muted" role="status">Gateway discovery unavailable: {{ gateway_scan.error }}. Check the server's LAN connection and refresh.</p>
+        {% else %}
+          <p class="muted" role="status">No discovery result is available for this gateway yet. Refresh discovery to check this subnet.</p>
+        {% endif %}
+      </section>
+    {% endif %}
     <div class="grid">
       {% for pc in pcs %}
         <div class="pc">
@@ -95,9 +175,20 @@
             <form method="post" action="{{ url_for('dean_pc_command') }}" style="display:inline">
               <input type="hidden" name="pc_id" value="{{ pc.id }}">
               <input type="hidden" name="command" value="{{ command }}">
+              <input type="hidden" name="network_id" value="{{ selected_network.id if selected_network else '' }}">
+              <input type="hidden" name="csrf_token" value="{{ network_csrf_token() }}">
               <button>{{ command|title }}</button>
             </form>
           {% endfor %}
+        </div>
+      {% else %}
+        <div class="panel">
+          <h2>No saved PCs</h2>
+          {% if selected_network %}
+            <p class="muted">No registered PCs belong to {{ selected_network.room }} ({{ selected_network.cidr }}) yet. An administrator can select PCs from discovery and save them here. Remote actions require a registered campus LAN agent.</p>
+          {% else %}
+            <p class="muted">Add or select a saved gateway to view its registered PCs. Only an administrator can add gateways and save discovered PCs.</p>
+          {% endif %}
         </div>
       {% endfor %}
     </div>
