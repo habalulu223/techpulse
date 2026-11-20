@@ -4970,14 +4970,66 @@ def dean_analytics():
     equipment_status = community_latest_equipment_statuses()
     available_equipment = sum(status == 'Available' for status in equipment_status.values())
     borrowed_equipment = sum(status == 'Borrowed' for status in equipment_status.values())
+    maintenance_equipment = sum(status == 'Under Maintenance' for status in equipment_status.values())
     borrowings_total = CommunityBorrowing.query.count()
     pending_borrowings = CommunityBorrowing.query.filter_by(borrowing_status='Pending').count()
     overdue_borrowings = CommunityBorrowing.query.filter_by(borrowing_status='Overdue').count()
     today_borrowings = CommunityBorrowing.query.filter(CommunityBorrowing.borrow_date >= today_start).count()
+    returned_query = CommunityBorrowing.query.filter(CommunityBorrowing.actual_return_date.isnot(None))
+    returned_borrowings = returned_query.count()
+    on_time_returns = returned_query.filter(
+        CommunityBorrowing.actual_return_date <= CommunityBorrowing.expected_return_date
+    ).count()
+    on_time_return_rate = round(on_time_returns / returned_borrowings * 100) if returned_borrowings else None
+    availability_rate = round(available_equipment / equipment_total * 100) if equipment_total else None
     recent_borrowings = CommunityBorrowing.query.order_by(
         CommunityBorrowing.borrow_date.desc()).limit(8).all()
 
-    monthly_labels, monthly_values = [], []
+    category_rows = db.session.query(
+        CommunityEquipmentCategory.category_name,
+        db.func.count(CommunityEquipment.equipment_id)
+    ).join(CommunityEquipment,
+        CommunityEquipment.category_id == CommunityEquipmentCategory.category_id
+    ).group_by(CommunityEquipmentCategory.category_name).order_by(
+        db.func.count(CommunityEquipment.equipment_id).desc(),
+        CommunityEquipmentCategory.category_name.asc()
+    ).all()
+    category_total = sum(count for _, count in category_rows)
+    category_colors = ['#176b87', '#23845b', '#2f6fed', '#b7791f', '#7a5aa6', '#c24141']
+    category_circumference = 2 * 3.14159 * 42
+    category_offset = 0
+    category_breakdown = []
+    for index, (category_name, count) in enumerate(category_rows):
+        share = count / category_total if category_total else 0
+        segment_length = share * category_circumference
+        category_breakdown.append({
+            'name': category_name,
+            'count': count,
+            'percent': round(share * 100),
+            'color': category_colors[index % len(category_colors)],
+            'dasharray': f'{segment_length:.2f} {category_circumference:.2f}',
+            'dashoffset': f'{-category_offset:.2f}',
+        })
+        category_offset += segment_length
+
+    monthly_labels = []
+    monthly_total_values = []
+    monthly_available_values = []
+    monthly_borrowed_values = []
+    monthly_maintenance_values = []
+    status_history_rows = db.session.query(
+        CommunityEquipmentStatusHistory.equipment_id,
+        CommunityEquipmentStatus.status_name,
+        CommunityEquipmentStatusHistory.changed_at,
+        CommunityEquipmentStatusHistory.status_history_id,
+    ).join(CommunityEquipmentStatus,
+        CommunityEquipmentStatus.status_id == CommunityEquipmentStatusHistory.status_id
+    ).order_by(
+        CommunityEquipmentStatusHistory.changed_at.asc(),
+        CommunityEquipmentStatusHistory.status_history_id.asc()
+    ).all()
+    status_by_equipment = {}
+    status_history_index = 0
     current_month_index = today.year * 12 + today.month - 1
     for offset in range(5, -1, -1):
         year, month_index = divmod(current_month_index - offset, 12)
@@ -4986,18 +5038,63 @@ def dean_analytics():
             next_month = datetime(year + 1, 1, 1)
         else:
             next_month = datetime(year, month_index + 2, 1)
-        amount = CommunityBorrowing.query.filter(CommunityBorrowing.borrow_date >= month_start,
-            CommunityBorrowing.borrow_date < next_month).count()
-        monthly_labels.append(month_start.strftime('%b %Y'))
-        monthly_values.append(amount)
+        monthly_labels.append(month_start.strftime('%b'))
+        while (status_history_index < len(status_history_rows)
+               and status_history_rows[status_history_index].changed_at < next_month):
+            history = status_history_rows[status_history_index]
+            status_by_equipment[history.equipment_id] = history.status_name
+            status_history_index += 1
+        monthly_total_values.append(len(status_by_equipment))
+        monthly_available_values.append(sum(status == 'Available' for status in status_by_equipment.values()))
+        monthly_borrowed_values.append(sum(status == 'Borrowed' for status in status_by_equipment.values()))
+        monthly_maintenance_values.append(sum(status == 'Under Maintenance' for status in status_by_equipment.values()))
+
+    recent_activity = []
+    for borrowing in recent_borrowings:
+        borrower_name = community_display_name(borrowing.borrower) or f'User #{borrowing.borrower_id}'
+        equipment_names = ', '.join(
+            line.equipment.equipment_name for line in borrowing.items if line.equipment
+        ) or 'No equipment listed'
+        recent_activity.append({
+            'kind': 'borrowing',
+            'title': f'Borrowing {borrowing.borrowing_status.lower()}',
+            'detail': f'{borrower_name} · {equipment_names}',
+            'timestamp': borrowing.borrow_date,
+        })
+    for issue in CommunityIssue.query.order_by(CommunityIssue.reported_at.desc()).limit(6).all():
+        reporter_name = community_display_name(issue.reporter) or f'User #{issue.reported_by}'
+        recent_activity.append({
+            'kind': 'issue',
+            'title': issue.issue_title,
+            'detail': f'{issue.equipment.equipment_name} · {reporter_name}',
+            'timestamp': issue.reported_at,
+        })
+    for record in CommunityMaintenanceRecord.query.order_by(
+            CommunityMaintenanceRecord.maintenance_date.desc(),
+            CommunityMaintenanceRecord.maintenance_id.desc()).limit(6).all():
+        recent_activity.append({
+            'kind': 'maintenance',
+            'title': f'Maintenance: {record.maintenance_type}',
+            'detail': record.equipment.equipment_name,
+            'timestamp': datetime.combine(record.maintenance_date, datetime.min.time()),
+        })
+    recent_activity.sort(key=lambda activity: activity['timestamp'], reverse=True)
+    recent_activity = recent_activity[:6]
 
     return render_template('dean_analytics.html',
         users_total=users_total, equipment_total=equipment_total,
         available_equipment=available_equipment, borrowed_equipment=borrowed_equipment,
+        maintenance_equipment=maintenance_equipment, availability_rate=availability_rate,
         borrowings_total=borrowings_total, pending_borrowings=pending_borrowings,
         overdue_borrowings=overdue_borrowings, today_borrowings=today_borrowings,
-        recent_borrowings=recent_borrowings,
-        monthly_labels=monthly_labels, monthly_values=monthly_values)
+        returned_borrowings=returned_borrowings, on_time_returns=on_time_returns,
+        on_time_return_rate=on_time_return_rate, recent_borrowings=recent_borrowings,
+        recent_activity=recent_activity, category_total=category_total,
+        category_breakdown=category_breakdown, monthly_labels=monthly_labels,
+        monthly_total_values=monthly_total_values,
+        monthly_available_values=monthly_available_values,
+        monthly_borrowed_values=monthly_borrowed_values,
+        monthly_maintenance_values=monthly_maintenance_values)
 
 
 @app.route('/dean/pc-command', methods=['POST'])

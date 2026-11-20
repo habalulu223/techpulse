@@ -185,7 +185,7 @@ h1 {
     color: #f4f8ff;
     font-size: 1.6rem;
     font-weight: 700;
-    letter-spacing: -.5px;
+    letter-spacing: 0;
 }
 
 .sub {
@@ -453,3 +453,68 @@ button:focus {
         transition: none;
     }
 }
+
+html,
+body,
+body.login-intro {
+    background: #f3f6fa !important;
+    background-image: none !important;
+    color: #243447 !important;
+}
+
+body .login-box {
+    color: #243447 !important;
+    background: #fff !important;
+    border: 1px solid #e4e9f0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 28px rgba(36, 52, 71, .1) !important;
+    backdrop-filter: none;
+}
+
+body .login-box :is(h1, p, div, span, label, strong, b, small, li, a) {
+    color: #243447 !important;
+    -webkit-text-fill-color: currentColor !important;
+}
+
+body .login-box :is(.sub, .register, .divider) {
+    color: #667085 !important;
+}
+
+body .login-box label { color: #667085 !important; }
+body .login-box :is(.register a, .sub a) { color: #176b87 !important; }
+body .login-box .warn { color: #80510e !important; background: #fff7e8 !important; border-color: #efdbb5 !important; }
+body .login-box .error { color: #a73535 !important; background: #fff0ef !important; border-color: #f1ceca !important; }
+body .login-box input:focus { border-color: #176b87 !important; outline-color: rgba(23, 107, 135, .2) !important; }
+
+body .login-box button[type=submit],
+body .login-box .download .btn {
+    background: #176b87 !important;
+    color: #fff !important;
+    border: 1px solid #176b87 !important;
+    border-radius: 8px !important;
+}
+
+body .login-box button[type=submit]:hover,
+body .login-box .download .btn:hover { background: #145a70 !important; border-color: #145a70 !important; color: #fff !important; }
+
+body .login-box .btn-google {
+    background: #fff !important;
+    color: #243447 !important;
+    border-color: #e4e9f0 !important;
+}
+
+body .login-box .btn-google:hover { background: #f3f6fa !important; border-color: #b7d4dd !important; }
+body .login-box .divider::before,
+body .login-box .divider::after { background: #e4e9f0; }
+body .login-box button.password-toggle:hover { background: #eaf3f6 !important; color: #176b87 !important; }
+body .login-box button.password-toggle:hover svg { color: #176b87 !important; stroke: #176b87 !important; }
+
+.login-back {
+    color: #fff !important;
+    background: #071426 !important;
+    border-color: #29445f !important;
+    border-radius: 8px !important;
+    backdrop-filter: none;
+}
+
+body .login-back:hover { color: #fff !important; background: #10243a !important; border-color: #176b87 !important; }

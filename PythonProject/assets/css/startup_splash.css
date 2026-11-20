@@ -8,7 +8,7 @@ body > .startup-splash {
     height: 100%;
     padding: 20px;
     box-sizing: border-box;
-    background: rgba(7, 20, 38, 0.97);
+    background: rgba(243, 246, 250, 0.97);
     z-index: 99999;
     pointer-events: auto;
     animation: startupFade 2.4s ease forwards;
@@ -20,12 +20,12 @@ body > .startup-splash {
     margin: 0;
     box-sizing: border-box;
     padding: 24px 26px;
-    border-radius: 16px;
-    border: 1px solid #29445f;
-    background: #0d2038;
-    box-shadow: 0 6px 24px rgba(25, 42, 70, 0.08);
+    border-radius: 8px;
+    border: 1px solid #e4e9f0;
+    background: #fff;
+    box-shadow: 0 6px 24px rgba(36, 52, 71, 0.08);
     text-align: center;
-    color: #f4f8ff;
+    color: #243447;
 }
 
 .startup-splash__mark {
@@ -38,15 +38,15 @@ body > .startup-splash {
 body .startup-splash__title {
     margin: 0;
     font-family: Inter, "Segoe UI", Arial, sans-serif;
-    letter-spacing: 0.02em;
-    color: #f4f8ff !important;
+    letter-spacing: 0;
+    color: #243447 !important;
     font-size: 1.05rem;
     font-weight: 650;
 }
 
 body .startup-splash__sub {
     margin: 10px 0 16px;
-    color: #b7c8dc !important;
+    color: #667085 !important;
     font-size: 0.86rem;
 }
 
@@ -59,7 +59,7 @@ body .startup-splash__sub {
     height: 6px;
     border-radius: 999px;
     overflow: hidden;
-    background: #203a55;
+    background: #e4e9f0;
 }
 
 .startup-splash__bar::after {
@@ -68,23 +68,23 @@ body .startup-splash__sub {
     height: 100%;
     width: 100%;
     transform: translateX(-100%);
-    background: linear-gradient(90deg, rgba(67, 224, 232, 0), #43e0e8, rgba(85, 164, 255, 0.8));
+    background: #176b87;
     animation: splashLoad 1.5s ease-out forwards;
 }
 
 body.startup-active .startup-splash {
     display: flex;
-    background: rgba(7, 20, 38, 0.97);
+    background: rgba(243, 246, 250, 0.97);
     animation: loginIntroFade 6.1s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
 }
 
 body.startup-active .startup-splash__panel {
     width: min(100%, 420px);
     padding: 30px;
-    border-radius: 18px;
-    border: 1px solid #29445f;
-    background: #0d2038;
-    box-shadow: 0 8px 30px rgba(25, 42, 70, 0.1);
+    border-radius: 8px;
+    border: 1px solid #e4e9f0;
+    background: #fff;
+    box-shadow: 0 8px 30px rgba(36, 52, 71, 0.1);
 }
 
 body.startup-active .startup-splash__mark {

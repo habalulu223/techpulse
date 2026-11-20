@@ -1,11 +1,17 @@
 html,
 body {
-    background-color: #071426 !important;
+    background-color: #f3f6fa !important;
     background-image: none !important;
 }
 
 body.login-intro {
+    background-color: #f3f6fa !important;
+}
+
+html:has(body.login-intro),
+body.login-intro {
     background-color: #071426 !important;
+    background-image: none !important;
 }
 
 .cyber-bg {

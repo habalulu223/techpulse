@@ -15,20 +15,59 @@
   {% include '_app_header.html' %}
 <main class="page">
   {% with messages=get_flashed_messages() %}{% for message in messages %}<div class="flash">{{ message }}</div>{% endfor %}{% endwith %}
-  <section class="metrics" aria-label="Analytics summary">
-    <article class="metric"><div class="metric-top"><span class="metric-label">Registered users</span><span class="metric-icon"><i class="fa-solid fa-users" aria-hidden="true"></i></span></div><strong class="metric-value">{{ users_total }}</strong><span class="metric-sub">Accounts in the system</span></article>
-    <article class="metric"><div class="metric-top"><span class="metric-label">Equipment items</span><span class="metric-icon"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i></span></div><strong class="metric-value">{{ equipment_total }}</strong><span class="metric-sub">Registered laboratory items</span></article>
-    <article class="metric accent"><div class="metric-top"><span class="metric-label">Available items</span><span class="metric-icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span></div><strong class="metric-value">{{ available_equipment }}</strong><span class="metric-sub">Ready to be borrowed</span></article>
-    <article class="metric"><div class="metric-top"><span class="metric-label">Borrowed items</span><span class="metric-icon"><i class="fa-solid fa-hand-holding" aria-hidden="true"></i></span></div><strong class="metric-value">{{ borrowed_equipment }}</strong><span class="metric-sub">Currently out with borrowers</span></article>
-    <article class="metric"><div class="metric-top"><span class="metric-label">Borrowing records</span><span class="metric-icon"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i></span></div><strong class="metric-value">{{ borrowings_total }}</strong><span class="metric-sub">All borrowing records on file</span></article>
-    <article class="metric warn"><div class="metric-top"><span class="metric-label">Pending requests</span><span class="metric-icon"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i></span></div><strong class="metric-value">{{ pending_borrowings }}</strong><span class="metric-sub">Waiting for approval</span></article>
-    <article class="metric"><div class="metric-top"><span class="metric-label">Overdue</span><span class="metric-icon"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span></div><strong class="metric-value">{{ overdue_borrowings }}</strong><span class="metric-sub">Past the expected return date</span></article>
+  <section class="metrics" aria-label="Equipment summary">
+    <article class="metric metric-total"><div class="metric-top"><span class="metric-label">Total equipment</span><span class="metric-icon"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i></span></div><strong class="metric-value">{{ equipment_total }}</strong><span class="metric-sub">Registered equipment</span></article>
+    <article class="metric metric-available"><div class="metric-top"><span class="metric-label">Available equipment</span><span class="metric-icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span></div><strong class="metric-value">{{ available_equipment }}</strong><span class="metric-sub">Latest recorded status</span></article>
+    <article class="metric metric-borrowed"><div class="metric-top"><span class="metric-label">Borrowed equipment</span><span class="metric-icon"><i class="fa-solid fa-right-left" aria-hidden="true"></i></span></div><strong class="metric-value">{{ borrowed_equipment }}</strong><span class="metric-sub">Latest recorded status</span></article>
+    <article class="metric metric-maintenance"><div class="metric-top"><span class="metric-label">Under maintenance</span><span class="metric-icon"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i></span></div><strong class="metric-value">{{ maintenance_equipment }}</strong><span class="metric-sub">Latest recorded status</span></article>
   </section>
+  {% set chart_peak = ([monthly_total_values, monthly_available_values, monthly_borrowed_values, monthly_maintenance_values]|map('max')|list|max) if monthly_labels else 0 %}
+  {% set chart_step = ((chart_peak + 3) // 4) if chart_peak else 1 %}
+  {% set chart_axis_max = chart_step * 4 %}
+  {% set chart_series = [
+    {'key': 'total', 'name': 'Total', 'points': monthly_total_values},
+    {'key': 'available', 'name': 'Available', 'points': monthly_available_values},
+    {'key': 'borrowed', 'name': 'Borrowed', 'points': monthly_borrowed_values},
+    {'key': 'maintenance', 'name': 'Maintenance', 'points': monthly_maintenance_values}
+  ] %}
   <section class="columns">
-    <article class="panel"><h2><i class="fa-solid fa-chart-simple" aria-hidden="true"></i> Monthly borrowings</h2><p class="panel-intro">Borrowing records created in the last six months.</p><div class="chart">{% set max_value=monthly_values|max if monthly_values else 0 %}{% for label in monthly_labels %}{% set amount=monthly_values[loop.index0] %}<div class="bar-row"><span>{{ label }}</span><div class="bar-track"><div class="bar-fill" style="width:{{ (amount / max_value * 100) if max_value else 0 }}%"></div></div><span class="bar-value">{{ amount }}</span></div>{% endfor %}</div></article>
-    <article class="panel"><h2><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Data summary</h2><p class="panel-intro">Totals are calculated from existing borrowing records.</p><div class="info-list"><div class="info-row"><span>All borrowing records</span><strong>{{ borrowings_total }}</strong></div><div class="info-row"><span>Pending requests</span><strong>{{ pending_borrowings }}</strong></div><div class="info-row"><span>Records created today</span><strong>{{ today_borrowings }}</strong></div></div></article>
+    <article class="panel trend-panel">
+      <div class="panel-heading"><div><h2><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Equipment overview</h2><p class="panel-intro">Month-end counts from recorded equipment status history.</p></div><span class="period-note">Last 6 months</span></div>
+      <div class="chart-legend" aria-label="Chart legend">{% for series in chart_series %}<span class="legend-item {{ series.key }}"><i aria-hidden="true"></i>{{ series.name }}</span>{% endfor %}</div>
+      <div class="chart-scroll"><svg class="trend-chart" viewBox="0 0 620 280" role="img" aria-label="Month-end equipment counts by recorded status over the last six months">
+        <title>Equipment status overview</title>
+        <desc>Monthly total equipment with recorded status history, available equipment, borrowed equipment, and equipment under maintenance.</desc>
+        <g class="chart-grid">{% for tick in range(5) %}<line x1="54" y1="{{ 22 + tick * 50 }}" x2="602" y2="{{ 22 + tick * 50 }}"/>{% endfor %}</g>
+        <g class="chart-axis-labels">{% for tick in range(5) %}<text x="44" y="{{ 26 + tick * 50 }}">{{ chart_axis_max - tick * chart_step }}</text>{% endfor %}</g>
+        {% for series in chart_series %}<polyline class="chart-line {{ series.key }}" points="{% for amount in series.points %}{{ 60 + loop.index0 * 105 }},{{ 222 - (amount / chart_axis_max * 190) }}{% if not loop.last %} {% endif %}{% endfor %}"/><g class="chart-points {{ series.key }}">{% for amount in series.points %}<g><title>{{ series.name }} · {{ monthly_labels[loop.index0] }}: {{ amount }}</title><circle cx="{{ 60 + loop.index0 * 105 }}" cy="{{ 222 - (amount / chart_axis_max * 190) }}" r="4"/></g>{% endfor %}</g>{% endfor %}
+        <g class="chart-months">{% for label in monthly_labels %}<text x="{{ 60 + loop.index0 * 105 }}" y="258">{{ label }}</text>{% endfor %}</g>
+      </svg></div>
+      <p class="chart-footnote">Equipment without a status-history entry is excluded from historical counts.</p>
+    </article>
+    <article class="panel category-panel"><div class="panel-heading"><div><h2><i class="fa-solid fa-chart-pie" aria-hidden="true"></i> Equipment by category</h2><p class="panel-intro">Share of registered equipment records.</p></div></div>
+      <div class="category-chart">
+        <svg class="category-donut" viewBox="0 0 100 100" role="img" aria-label="Equipment distribution by category">
+          <circle class="donut-track" cx="50" cy="50" r="42"/>
+          {% for category in category_breakdown %}<circle class="donut-segment" cx="50" cy="50" r="42" style="stroke:{{ category.color }};stroke-dasharray:{{ category.dasharray }};stroke-dashoffset:{{ category.dashoffset }}"/>{% endfor %}
+          <text class="donut-count" x="50" y="48">{{ category_total }}</text><text class="donut-caption" x="50" y="59">Total</text>
+        </svg>
+        <div class="category-legend">{% for category in category_breakdown %}<div class="category-item"><span class="category-name"><i style="background:{{ category.color }}"></i>{{ category.name }}</span><strong>{{ category.count }} · {{ category.percent }}%</strong></div>{% else %}<p class="empty">No categorized equipment records.</p>{% endfor %}</div>
+      </div>
+    </article>
   </section>
-  <section class="panel"><h2><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i> Recent borrowing records</h2><p class="panel-intro">The latest borrowing records saved in the system.</p><div class="table-wrap"><table><thead><tr><th>Record</th><th>Borrower</th><th>Equipment</th><th>Borrowed</th><th>Due</th><th>Status</th></tr></thead><tbody>{% for borrowing in recent_borrowings %}<tr><td>#{{ borrowing.borrowing_id }}</td><td>{{ borrowing.borrower.first_name }} {{ borrowing.borrower.last_name }}</td><td class="items-cell">{% for line in borrowing.items %}{{ line.equipment.equipment_name }}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</td><td>{{ borrowing.borrow_date.strftime('%d %b %Y') }}</td><td>{{ borrowing.expected_return_date.strftime('%d %b %Y') }}</td><td><span class="badge {{ borrowing.borrowing_status|lower|replace(' ', '-') }}">{{ borrowing.borrowing_status }}</span></td></tr>{% else %}<tr><td colspan="6">No borrowing records yet.</td></tr>{% endfor %}</tbody></table></div></section>
+  <section class="lower-panels">
+    <article class="panel activity-panel"><div class="panel-heading"><div><h2><i class="fa-solid fa-bolt" aria-hidden="true"></i> Recent activities</h2><p class="panel-intro">Latest borrowing, issue, and maintenance records.</p></div></div>
+      <div class="activity-list">{% for activity in recent_activity %}<div class="activity-row"><span class="activity-icon {{ activity.kind }}"><i class="fa-solid {% if activity.kind == 'borrowing' %}fa-right-left{% elif activity.kind == 'issue' %}fa-triangle-exclamation{% else %}fa-screwdriver-wrench{% endif %}" aria-hidden="true"></i></span><div class="activity-copy"><strong>{{ activity.title }}</strong><span>{{ activity.detail }}</span></div><time datetime="{{ activity.timestamp.isoformat() }}">{{ activity.timestamp.strftime('%d %b, %H:%M') }}</time></div>{% else %}<p class="empty">No recent activity records.</p>{% endfor %}</div>
+    </article>
+    <article class="panel insights-panel"><div class="panel-heading"><div><h2><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Department insights</h2><p class="panel-intro">Calculated from current equipment and return records.</p></div></div>
+      <div class="insights-grid">
+        <div class="insight"><i class="fa-solid fa-chart-column" aria-hidden="true"></i><strong>{% if availability_rate is not none %}{{ availability_rate }}%{% else %}—{% endif %}</strong><span>Equipment available</span><small>{{ available_equipment }} of {{ equipment_total }} registered</small></div>
+        <div class="insight"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i><strong>{{ pending_borrowings }}</strong><span>Pending approvals</span><small>Current pending borrowing records</small></div>
+        <div class="insight"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><strong>{% if on_time_return_rate is not none %}{{ on_time_return_rate }}%{% else %}—{% endif %}</strong><span>On-time return rate</span><small>{% if returned_borrowings %}{{ on_time_returns }} of {{ returned_borrowings }} returned on time{% else %}No completed returns recorded{% endif %}</small></div>
+      </div>
+    </article>
+  </section>
+  <section class="panel recent-panel"><div class="panel-heading"><div><h2><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i> Recent borrowing records</h2><p class="panel-intro">Latest borrowing records saved in the system.</p></div></div><div class="table-wrap"><table><thead><tr><th>Record</th><th>Borrower</th><th>Equipment</th><th>Borrowed</th><th>Due</th><th>Status</th></tr></thead><tbody>{% for borrowing in recent_borrowings %}<tr><td>#{{ borrowing.borrowing_id }}</td><td>{{ borrowing.borrower.first_name }} {{ borrowing.borrower.last_name }}</td><td class="items-cell">{% for line in borrowing.items %}{{ line.equipment.equipment_name }}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</td><td>{{ borrowing.borrow_date.strftime('%d %b %Y') }}</td><td>{{ borrowing.expected_return_date.strftime('%d %b %Y') }}</td><td><span class="badge {{ borrowing.borrowing_status|lower|replace(' ', '-') }}">{{ borrowing.borrowing_status }}</span></td></tr>{% else %}<tr><td colspan="6">No borrowing records yet.</td></tr>{% endfor %}</tbody></table></div></section>
 </main>
 </body>
 </html>

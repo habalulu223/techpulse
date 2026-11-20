@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Join CyberCore</title>
+    <title>TechPulse | Create Account</title>
     <link rel='icon' type='image/x-icon' href='/favicon.ico'>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/register.css') }}">
@@ -12,7 +12,7 @@
     {% include '_animated_background.html' %}
     {% include '_startup_splash.html' %}
     <div class="register-box">
-        <h1>New User</h1>
+        <h1>Create Account</h1>
 
         {% with messages = get_flashed_messages(category_filter=["error"]) %}
             {% if messages %}
@@ -23,9 +23,11 @@
         {% endwith %}
 
         <form method="POST">
-            <input type="text" name="username" placeholder="Username" required autocomplete="off">
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit">CREATE ACCOUNT</button>
+            <label for="username">Username</label>
+            <input id="username" type="text" name="username" placeholder="Username" required autocomplete="off">
+            <label for="password">Password</label>
+            <input id="password" type="password" name="password" placeholder="Password" required>
+            <button type="submit">Create account</button>
         </form>
 
         <a href="/login">Already have an account? Login</a>

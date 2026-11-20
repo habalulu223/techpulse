@@ -73,7 +73,7 @@ main.password-main > .subtitle { margin: 0 0 6px !important; }
   background: rgba(10, 20, 33, .6) !important;
   color: #fff !important;
   -webkit-text-fill-color: #fff !important;
-  font-size: clamp(0.8rem, 0.3vw + 0.72rem, 0.95rem) !important;
+  font-size: 14px !important;
   font-weight: 650 !important;
   line-height: 1.3;
   backdrop-filter: blur(2px);
@@ -106,7 +106,7 @@ main.password-main > .subtitle { margin: 0 0 6px !important; }
   background: var(--tp-accent-soft);
   box-shadow: 0 10px 28px rgba(8, 14, 24, .35);
   color: var(--tp-accent-strong);
-  font-size: clamp(1.6rem, 3vw, 2.6rem);
+  font-size: 36px;
   font-weight: 800;
 }
 .profile-avatar > span {
@@ -161,16 +161,16 @@ main.password-main > .subtitle { margin: 0 0 6px !important; }
 .profile-summary-copy { flex: 1 1 220px; min-width: 0; padding-bottom: 8px; }
 .profile-name {
   margin: 0 !important;
-  font-size: clamp(1.15rem, 1.2vw + 0.9rem, 1.55rem);
+  font-size: 22px;
   font-weight: 750;
-  letter-spacing: -.02em;
+  letter-spacing: 0;
   color: #fff !important;
   text-shadow: 0 1px 10px rgba(0, 0, 0, .35);
 }
 .profile-meta {
   margin: 4px 0 0 !important;
   color: rgba(255, 255, 255, .82) !important;
-  font-size: clamp(0.8rem, 0.3vw + 0.72rem, 0.95rem);
+  font-size: 13px;
 }
 
 .profile-toolbar {
@@ -196,7 +196,7 @@ main.password-main > .subtitle { margin: 0 0 6px !important; }
 }
 .recent-reports-head h2 { margin: 0 !important; }
 .recent-reports-link {
-  font-size: clamp(0.8rem, 0.3vw + 0.72rem, 0.95rem);
+  font-size: 13px;
   font-weight: 650;
   color: var(--tp-accent-strong) !important;
   text-decoration: none;
@@ -210,20 +210,21 @@ main.password-main > .subtitle { margin: 0 0 6px !important; }
 .report-row:first-of-type { border-top: 0; padding-top: 8px; }
 .report-row b {
   color: var(--tp-ink);
-  font-size: clamp(0.95rem, 0.35vw + 0.85rem, 1.08rem);
+  font-size: 15px;
 }
 .report-equipment {
   margin-left: 6px;
   color: var(--tp-muted);
-  font-size: clamp(0.8rem, 0.3vw + 0.72rem, 0.95rem);
+  font-size: 13px;
 }
-.report-row .muted { margin-top: 3px; font-size: clamp(0.75rem, 0.25vw + 0.68rem, 0.88rem); }
+.report-row .muted { margin-top: 3px; font-size: 12px; }
 .report-description {
   margin: 8px 0 0 !important;
   color: var(--tp-ink);
-  font-size: clamp(0.85rem, 0.3vw + 0.76rem, 0.98rem);
+  font-size: 14px;
   line-height: 1.45;
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;

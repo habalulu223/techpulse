@@ -9,40 +9,40 @@
 
 :root {
   color-scheme: light;
-  --tp-bg: #f4f7fb;
+  --tp-bg: #f3f6fa;
   --tp-surface: #ffffff;
-  --tp-ink: #17263b;
-  --tp-muted: #68788d;
-  --tp-line: #e3eaf2;
-  --tp-accent: #315d91;
-  --tp-accent-strong: #274d7b;
-  --tp-accent-hover: #274d7b;
-  --tp-accent-soft: #eef3fa;
-  --tp-sidebar: #17263b;
-  --tp-sidebar-line: #26364d;
-  --tp-sidebar-ink: #c4d0df;
-  --tp-sidebar-hover: #263851;
+  --tp-ink: #243447;
+  --tp-muted: #667085;
+  --tp-line: #e4e9f0;
+  --tp-accent: #176b87;
+  --tp-accent-strong: #145a70;
+  --tp-accent-hover: #145a70;
+  --tp-accent-soft: #eaf3f6;
+  --tp-sidebar: #10243a;
+  --tp-sidebar-line: #25394e;
+  --tp-sidebar-ink: #c6d1dc;
+  --tp-sidebar-hover: #1c344b;
   --tp-nav-w: 248px;
-  --tp-navy: #17263b;
-  --tp-navy-hover: #263851;
-  --tp-navy-border: #17263b;
-  --tp-success: #1c7a4d;
-  --tp-warn: #8a5a1f;
-  --tp-danger: #a33a3a;
-  --tp-shadow: 0 4px 16px rgba(24, 39, 60, .045);
-  --tp-radius: 14px;
-  /* Fluid type scale: rem sizes across dashboards follow the viewport. */
-  --tp-fs-root: clamp(12.5px, 0.55vw + 11px, 17px);
-  --tp-fs-small: clamp(0.72rem, 0.2vw + 0.68rem, 0.86rem);
-  --tp-fs-muted: clamp(0.8rem, 0.25vw + 0.72rem, 0.95rem);
-  --tp-fs-body: 1rem;
-  --tp-fs-btn: clamp(0.86rem, 0.28vw + 0.78rem, 1rem);
-  --tp-fs-nav: clamp(0.88rem, 0.25vw + 0.8rem, 1rem);
-  --tp-fs-h3: clamp(0.92rem, 0.3vw + 0.84rem, 1.05rem);
-  --tp-fs-h2: clamp(1rem, 0.45vw + 0.88rem, 1.22rem);
-  --tp-fs-h1: clamp(1.28rem, 1.1vw + 0.95rem, 2rem);
-  --tp-fs-stat: clamp(1.2rem, 0.9vw + 0.95rem, 1.65rem);
-  --tp-fs-title: clamp(1.05rem, 0.7vw + 0.88rem, 1.35rem);
+  --tp-navy: #176b87;
+  --tp-navy-hover: #145a70;
+  --tp-navy-border: #176b87;
+  --tp-success: #23845b;
+  --tp-warn: #b7791f;
+  --tp-danger: #c24141;
+  --tp-info: #2f6fed;
+  --tp-shadow: 0 1px 3px rgba(36, 52, 71, .06);
+  --tp-radius: 8px;
+  --tp-fs-root: 16px;
+  --tp-fs-small: 12px;
+  --tp-fs-muted: 13px;
+  --tp-fs-body: 14px;
+  --tp-fs-btn: 14px;
+  --tp-fs-nav: 14px;
+  --tp-fs-h3: 16px;
+  --tp-fs-h2: 18px;
+  --tp-fs-h1: 26px;
+  --tp-fs-stat: 28px;
+  --tp-fs-title: 18px;
 }
 
 /* ---- Base ---------------------------------------------------------------- */
@@ -94,7 +94,7 @@ body:has(.app-header) {
 .cyber-bg, .cyber-core, .cyber-grid { display: none !important; }
 
 /* ---- Typography ---------------------------------------------------------- */
-h1, h2, h3, h4 { color: var(--tp-ink) !important; letter-spacing: -.025em; font-family: inherit !important; text-shadow: none !important; text-transform: none !important; }
+h1, h2, h3, h4 { color: var(--tp-ink) !important; letter-spacing: 0; font-family: inherit !important; text-shadow: none !important; text-transform: none !important; }
 h1 { font-size: var(--tp-fs-h1) !important; font-weight: 750; }
 /* Page stylesheets must not change section-heading size or spacing;
    consistency beats per-page overrides. */
@@ -107,7 +107,7 @@ small, .muted, .sub, .label, .tile-label, .helper, .fine-print, .subtle,
   color: var(--tp-muted) !important;
   font-size: var(--tp-fs-muted);
 }
-.eyebrow { color: var(--tp-accent) !important; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; font-size: var(--tp-fs-small); }
+.eyebrow { color: var(--tp-accent) !important; font-weight: 750; letter-spacing: 0; text-transform: uppercase; font-size: var(--tp-fs-small); }
 
 /* ---- Links --------------------------------------------------------------- */
 a { color: var(--tp-accent-strong); text-decoration: none; transition: color .15s ease, background-color .15s ease, border-color .15s ease, transform .15s ease; }
@@ -169,7 +169,7 @@ button, .btn, .button, .workspace-link, input[type=submit], input[type=button], 
   background: var(--tp-navy) !important;
   color: #fff !important;
   border: 1px solid var(--tp-navy-border) !important;
-  border-radius: 9px !important;
+  border-radius: 8px !important;
   padding: clamp(8px, 0.6vw, 10px) clamp(12px, 1vw, 15px) !important;
   font-size: var(--tp-fs-btn) !important;
   font-weight: 650 !important;
@@ -208,7 +208,7 @@ a.btn-secondary:hover, button.btn-secondary:hover {
 .field-label, .section-label {
   display: block; margin: 14px 0 6px;
   color: var(--tp-muted) !important;
-  font-size: var(--tp-fs-small); font-weight: 750; letter-spacing: .07em; text-transform: uppercase;
+  font-size: var(--tp-fs-small); font-weight: 750; letter-spacing: 0; text-transform: uppercase;
 }
 
 /* Card link-buttons ("Open ... →") behave as accent buttons. Match the
@@ -216,24 +216,22 @@ a.btn-secondary:hover, button.btn-secondary:hover {
 .card a, .card-action a {
   display: inline-block; align-self: flex-start;
   background: var(--tp-navy) !important; color: #fff !important;
-  border: 1px solid var(--tp-navy-border) !important; border-radius: 9px;
+  border: 1px solid var(--tp-navy-border) !important; border-radius: 8px;
   padding: clamp(8px, 0.6vw, 10px) clamp(12px, 1vw, 15px);
   font-size: var(--tp-fs-btn); font-weight: 700; text-decoration: none !important;
 }
 
-/* ---- Header controls (on the dark navy chrome) --------------------------- */
-/* These sit inside the navy header/top-bar, so a navy fill would vanish.
-   Keep them as light pills with navy text for contrast. */
+/* ---- Header controls ----------------------------------------------------- */
 .header-action-button {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  background: #fff !important; color: var(--tp-navy) !important;
-  border: 1px solid #fff !important; border-radius: 9px !important;
+  background: var(--tp-accent) !important; color: #fff !important;
+  border: 1px solid var(--tp-accent) !important; border-radius: 8px !important;
   min-height: 40px; padding: 8px 14px !important; font-weight: 700 !important;
   text-decoration: none !important; box-shadow: none !important;
 }
-.header-action-button *, .header-action-button i, .header-action-button svg { color: var(--tp-navy) !important; -webkit-text-fill-color: var(--tp-navy) !important; }
-.header-action-button:hover { background: #eaf1fa !important; border-color: #eaf1fa !important; color: #0f1e30 !important; }
-.header-action-button:hover * { color: #0f1e30 !important; -webkit-text-fill-color: #0f1e30 !important; }
+.header-action-button *, .header-action-button i, .header-action-button svg { color: #fff !important; -webkit-text-fill-color: #fff !important; }
+.header-action-button:hover { background: var(--tp-accent-hover) !important; border-color: var(--tp-accent-hover) !important; color: #fff !important; }
+.header-action-button:hover * { color: #fff !important; -webkit-text-fill-color: #fff !important; }
 :is(header, .top-bar, .top, .head) :is(.btn, button, .workspace-link, input[type=submit]) {
   background: #fff !important; color: var(--tp-navy) !important; border-color: #fff !important;
 }
@@ -258,6 +256,7 @@ input:not([type=checkbox]):not([type=radio]), select, textarea {
 input::placeholder, textarea::placeholder { color: #8a97a8 !important; opacity: 1; }
 input:focus, select:focus, textarea:focus { outline: 3px solid rgba(23, 38, 59, .16) !important; border-color: var(--tp-navy) !important; box-shadow: none !important; }
 input[type=date], input[type=time] { color-scheme: light !important; }
+label { display: block; color: var(--tp-muted) !important; font-size: var(--tp-fs-muted); font-weight: 600; text-align: left; }
 form { display: grid; gap: 10px; margin: 10px 0; }
 .inline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .inline > * { flex: 1 1 140px; }
@@ -291,14 +290,14 @@ tr:hover td { background: #fbfcfe; }
 /* ---- Flash / alerts ------------------------------------------------------ */
 .flash, .alert, .user-guidance, .friendly-note, .notice {
   background: var(--tp-accent-soft) !important;
-  color: #6a1526 !important;
-  border: 1px solid #c3d4ea !important;
-  border-radius: 10px !important;
+  color: var(--tp-ink) !important;
+  border: 1px solid #c8dfe6 !important;
+  border-radius: 8px !important;
   padding: 12px 14px !important;
   margin-bottom: 14px !important;
   box-shadow: none !important;
 }
-.flash :is(div, p, span, strong, b, small), .alert :is(div, p, span, strong, b, small) { color: #6a1526 !important; }
+.flash :is(div, p, span, strong, b, small), .alert :is(div, p, span, strong, b, small) { color: var(--tp-ink) !important; }
 
 /* ==========================================================================
    Fixed dashboard sidebar (.dash-nav)
@@ -316,7 +315,7 @@ tr:hover td { background: #fbfcfe; }
 .dash-nav .dash-brand {
   display: block; padding: 4px 14px 16px; margin-bottom: 6px;
   color: #fff !important; background: transparent !important; border: 0 !important; box-shadow: none !important;
-  font-weight: 750; letter-spacing: -.01em; font-size: var(--tp-fs-title);
+  font-weight: 750; letter-spacing: 0; font-size: var(--tp-fs-title);
   border-bottom: 1px solid var(--tp-sidebar-line) !important; text-decoration: none;
 }
 .dash-nav .dash-brand small {
@@ -324,8 +323,18 @@ tr:hover td { background: #fbfcfe; }
   color: var(--tp-sidebar-ink) !important;
   font-weight: 500;
   font-size: var(--tp-fs-small);
-  letter-spacing: .04em;
+  letter-spacing: 0;
   margin-top: 2px;
+  max-width: 180px;
+  line-height: 1.45;
+}
+.dash-nav-group-label {
+  padding: 14px 14px 5px;
+  color: #8fa2b5 !important;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 .dash-nav a {
   display: flex; align-items: center; gap: 10px;
@@ -342,7 +351,7 @@ tr:hover td { background: #fbfcfe; }
   min-height: 46px !important; padding: 11px 14px !important; border-radius: 9px !important;
 }
 .dash-nav a:hover { background: var(--tp-sidebar-hover) !important; color: #fff !important; }
-.dash-nav a[aria-current=page] { background: #fff !important; color: var(--tp-accent-strong) !important; font-weight: 700; }
+.dash-nav a[aria-current=page] { background: var(--tp-accent) !important; color: #fff !important; font-weight: 700; }
 .dash-nav a i, .dash-nav a svg { color: currentColor !important; -webkit-text-fill-color: currentColor !important; }
 .dash-nav .dash-logout { margin-top: auto; }
 
@@ -376,10 +385,10 @@ body:not(:has(.dash-nav)) .view-tabs { padding: 0 20px; }
    templates force white header text, so a light bar would be unreadable.
    ========================================================================== */
 header, .top-bar, .top, .head {
-  background: var(--tp-sidebar) !important;
-  color: #fff !important;
-  border-bottom: 1px solid var(--tp-sidebar-line) !important;
-  box-shadow: 0 2px 14px rgba(18, 32, 52, .12) !important;
+  background: var(--tp-surface) !important;
+  color: var(--tp-ink) !important;
+  border-bottom: 1px solid var(--tp-line) !important;
+  box-shadow: none !important;
   max-width: none;
 }
 /* Keep the page header pinned while the content scrolls, matching the fixed sidebar.
@@ -391,12 +400,12 @@ body > :is(header, .top-bar, .top, .head) {
   z-index: 35;
 }
 :is(header, .top-bar, .top, .head) :is(h1, h2, h3, span, small, strong, b, a, .muted, .sub, .identity):not(.profile-avatar-link):not(.header-action-button):not(.btn):not(.button):not(.workspace-link) {
-  color: #fff !important;
-  -webkit-text-fill-color: #fff !important;
+  color: var(--tp-ink) !important;
+  -webkit-text-fill-color: var(--tp-ink) !important;
   text-shadow: none !important;
 }
 .profile-avatar-link svg { fill: var(--tp-accent-strong) !important; }
-header .brand, .top-bar .brand, .head .brand { color: #fff !important; font-weight: 750; text-decoration: none; }
+header .brand, .top-bar .brand, .head .brand { color: var(--tp-ink) !important; font-weight: 750; text-decoration: none; }
 header .user-menu, .head nav, .top-actions, .dean-head-actions, .community-head-actions {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
@@ -408,8 +417,8 @@ a.brand { color: var(--tp-accent-strong); font-weight: 750; text-decoration: non
 .app-header {
   box-sizing: border-box;
   padding: 0 !important;
-  background: var(--tp-sidebar) !important;
-  border-bottom: 1px solid var(--tp-sidebar-line) !important;
+  background: var(--tp-surface) !important;
+  border-bottom: 1px solid var(--tp-line) !important;
 }
 /* Header chips size themselves with explicit width/height/min-height; without
    a border-box reset the 1px border and padding inflate them on pages that
@@ -439,34 +448,35 @@ a.brand { color: var(--tp-accent-strong); font-weight: 750; text-decoration: non
   align-items: center;
   padding: 8px 13px;
   border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, .26) !important;
-  background: rgba(255, 255, 255, .09) !important;
-  color: #fff !important;
-  -webkit-text-fill-color: #fff !important;
+  display: none;
+  border: 1px solid var(--tp-line) !important;
+  background: #fff !important;
+  color: var(--tp-ink) !important;
+  -webkit-text-fill-color: var(--tp-ink) !important;
   font-size: var(--tp-fs-nav);
   font-weight: 750;
-  letter-spacing: -.01em;
+  letter-spacing: 0;
   text-decoration: none !important;
   white-space: nowrap;
 }
-.app-header-brand:hover { background: rgba(255, 255, 255, .17) !important; }
+.app-header-brand:hover { background: var(--tp-bg) !important; }
 .app-header-titles { min-width: 0; }
 .app-header-title {
   margin: 0 !important;
   font-size: var(--tp-fs-title) !important;
   line-height: 1.2;
   font-weight: 750;
-  letter-spacing: -.02em !important;
+  letter-spacing: 0 !important;
   text-transform: none !important;
-  color: #fff !important;
-  -webkit-text-fill-color: #fff !important;
+  color: var(--tp-ink) !important;
+  -webkit-text-fill-color: var(--tp-ink) !important;
 }
 .app-header-sub {
   margin: 3px 0 0 !important;
   font-size: var(--tp-fs-muted);
   line-height: 1.35;
-  color: #b9c7d8 !important;
-  -webkit-text-fill-color: #b9c7d8 !important;
+  color: var(--tp-muted) !important;
+  -webkit-text-fill-color: var(--tp-muted) !important;
 }
 .app-header-actions {
   display: flex;
@@ -477,8 +487,8 @@ a.brand { color: var(--tp-accent-strong); font-weight: 750; text-decoration: non
   min-width: 0;
 }
 .app-header .app-header-user {
-  color: #c4d0df !important;
-  -webkit-text-fill-color: #c4d0df !important;
+  color: var(--tp-muted) !important;
+  -webkit-text-fill-color: var(--tp-muted) !important;
   font-size: var(--tp-fs-muted);
   font-weight: 600;
   white-space: nowrap;
@@ -520,9 +530,10 @@ a.brand { color: var(--tp-accent-strong); font-weight: 750; text-decoration: non
   -webkit-text-fill-color: var(--tp-warn) !important; border: 1px solid #f0dfba !important;
 }
 .tag.status-danger, .badge.status-danger, .occupied .status-badge {
-  background: #eef3fa !important; color: var(--tp-danger) !important;
-  -webkit-text-fill-color: var(--tp-danger) !important; border: 1px solid #c3d4ea !important;
+  background: #fff0ef !important; color: var(--tp-danger) !important;
+  -webkit-text-fill-color: var(--tp-danger) !important; border: 1px solid #f1ceca !important;
 }
+.occupied .status-badge { background: #edf3ff !important; color: var(--tp-info) !important; -webkit-text-fill-color: var(--tp-info) !important; border-color: #cbd9ff !important; }
 .tag.status-neutral, .badge.status-neutral {
   background: #eef1f6 !important; color: #43536b !important;
   -webkit-text-fill-color: #43536b !important; border: 1px solid var(--tp-line) !important;
@@ -545,9 +556,6 @@ a.brand { color: var(--tp-accent-strong); font-weight: 750; text-decoration: non
 /* Tablet tier: the sidebar folds into a scrollable top bar so the page keeps its
    full width instead of squeezing everything beside a fixed column. */
 @media (max-width: 1024px) {
-  :root {
-    --tp-fs-root: clamp(12.5px, 0.8vw + 10.5px, 16px);
-  }
   .dash-nav {
     position: static !important; width: auto !important; bottom: auto;
     flex-direction: row !important; align-items: center;
@@ -556,6 +564,7 @@ a.brand { color: var(--tp-accent-strong); font-weight: 750; text-decoration: non
     border-right: 0 !important; border-bottom: 1px solid var(--tp-sidebar-line);
   }
   .dash-nav .dash-brand { border-bottom: 0; padding: 6px 10px; white-space: nowrap; }
+  .dash-nav .dash-brand small, .dash-nav-group-label { display: none !important; }
   .dash-nav .dash-logout { margin-top: 0; }
   .dash-nav a { white-space: nowrap; flex: 0 0 auto; }
   body:has(.app-header):has(.dash-nav) { padding-left: 0; }
@@ -563,9 +572,6 @@ a.brand { color: var(--tp-accent-strong); font-weight: 750; text-decoration: non
 
 /* Phone tier: stacking and tighter type scale. */
 @media (max-width: 760px) {
-  :root {
-    --tp-fs-root: clamp(12px, 1.6vw + 9.5px, 15px);
-  }
   main { padding: 16px; }
   .grid, .cards, .columns, .cols { grid-template-columns: 1fr; }
   .analytics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -573,9 +579,6 @@ a.brand { color: var(--tp-accent-strong); font-weight: 750; text-decoration: non
   th, td { padding: 9px 10px !important; }
 }
 @media (max-width: 520px) {
-  :root {
-    --tp-fs-root: clamp(11.5px, 2.2vw + 8.5px, 14.5px);
-  }
   .analytics-grid { grid-template-columns: 1fr; }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .stat { padding: 12px !important; }
@@ -607,20 +610,21 @@ html[data-theme="dark"] {
   --tp-ink: #e7eef8;
   --tp-muted: #9aabc2;
   --tp-line: #283a52;
-  --tp-accent: #8fb6e6;
-  --tp-accent-strong: #a8c8ee;
-  --tp-accent-hover: #a8c8ee;
-  --tp-accent-soft: #1c2c44;
+  --tp-accent: #4a9bb0;
+  --tp-accent-strong: #80bfd0;
+  --tp-accent-hover: #80bfd0;
+  --tp-accent-soft: #1c3442;
   --tp-sidebar: #0a1320;
   --tp-sidebar-line: #1e2e44;
   --tp-sidebar-ink: #aebdd2;
   --tp-sidebar-hover: #18273c;
-  --tp-navy: #315d91;
-  --tp-navy-hover: #3a6ba5;
-  --tp-navy-border: #3d6fa9;
+  --tp-navy: #4a9bb0;
+  --tp-navy-hover: #3c879b;
+  --tp-navy-border: #4a9bb0;
   --tp-success: #7fd3a8;
   --tp-warn: #e8c287;
   --tp-danger: #f2a4a4;
+  --tp-info: #8fb4ff;
   --tp-shadow: 0 4px 16px rgba(0, 0, 0, .35);
 }
 
@@ -710,10 +714,13 @@ html[data-theme="dark"] .badge.status-warn {
   -webkit-text-fill-color: #e8c287 !important; border-color: rgba(224, 178, 106, .36) !important;
 }
 html[data-theme="dark"] .tag.status-danger,
-html[data-theme="dark"] .badge.status-danger,
-html[data-theme="dark"] .occupied .status-badge {
+html[data-theme="dark"] .badge.status-danger {
   background: rgba(239, 139, 139, .14) !important; color: #f2a4a4 !important;
   -webkit-text-fill-color: #f2a4a4 !important; border-color: rgba(239, 139, 139, .36) !important;
+}
+html[data-theme="dark"] .occupied .status-badge {
+  background: rgba(143, 180, 255, .14) !important; color: var(--tp-info) !important;
+  -webkit-text-fill-color: var(--tp-info) !important; border-color: rgba(143, 180, 255, .36) !important;
 }
 html[data-theme="dark"] .tag.status-neutral,
 html[data-theme="dark"] .badge.status-neutral {
@@ -729,20 +736,12 @@ html[data-font="serif"] body {
   font-family: Georgia, "Times New Roman", Cambria, serif !important;
 }
 
-/* Text size: scales the fluid root so every rem-based size follows. */
+/* Text size: retain the account preference with fixed, predictable steps. */
 html[data-font-size="compact"] {
-  --tp-fs-root: clamp(11.5px, 0.45vw + 10.2px, 15px);
+  --tp-fs-root: 14px;
   font-size: var(--tp-fs-root);
 }
 html[data-font-size="large"] {
-  --tp-fs-root: clamp(14px, 0.65vw + 12px, 18.5px);
+  --tp-fs-root: 18px;
   font-size: var(--tp-fs-root);
-}
-@media (max-width: 760px) {
-  html[data-font-size="compact"] { --tp-fs-root: clamp(11px, 1.4vw + 8.8px, 13.5px); }
-  html[data-font-size="large"] { --tp-fs-root: clamp(13px, 1.8vw + 10px, 16.5px); }
-}
-@media (max-width: 520px) {
-  html[data-font-size="compact"] { --tp-fs-root: clamp(10.5px, 2vw + 8px, 13px); }
-  html[data-font-size="large"] { --tp-fs-root: clamp(12.5px, 2.2vw + 9.5px, 15.5px); }
 }
