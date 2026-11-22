@@ -4,7 +4,7 @@
    the only navigation: the horizontal tab row under the header was removed, so every
    destination it used to offer is listed here instead. #}
 <aside class="dash-nav" aria-label="Dashboard navigation">
-   <a class="dash-brand" href="{{ url_for('role_dashboard') }}">TechPulse<small>IT Department Equipment Lifecycle Management System</small></a>
+   <a class="dash-brand" href="{{ url_for('role_dashboard') }}">TechPulse</a>
   {% set p = request.path %}
   {% set is_staff = current_user.is_management or current_user.can_manage_equipment %}
   {% set default_view = 'inventory' if is_staff else 'equipment' %}

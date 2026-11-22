@@ -20,7 +20,12 @@
     <section class="panel gateway-settings" aria-labelledby="saved-gateways-heading">
       <h2 id="saved-gateways-heading">Saved gateways</h2>
       {% if room_networks %}
-        <p id="gateway-filter-help" class="muted">Filter discovery, saved PCs, and statistics by a saved network. This selection does not change the server's operating system routing.</p>
+        <nav class="room-nav" aria-label="Saved gateway rooms">
+          {% for network in room_networks %}
+            <a href="{{ url_for('dean_dashboard', network_id=network.id) }}"{% if selected_network and selected_network.id == network.id %} aria-current="page" class="active"{% endif %}>{{ network.room }}<small>{{ network.gateway_ip }}</small></a>
+          {% endfor %}
+        </nav>
+        <p id="gateway-filter-help" class="muted">Choose a room to search PCs on its saved gateway.</p>
         <form class="gateway-selector" method="get" action="{{ url_for('dean_dashboard') }}">
           <div class="gateway-field">
             <label for="network-id">Gateway network filter</label>
@@ -52,16 +57,9 @@
                 <label for="gateway-ip">Gateway IPv4 address (required, e.g. 192.168.10.1)</label>
                 <input id="gateway-ip" name="gateway_ip" maxlength="64" required>
               </div>
-              <div class="gateway-field">
-                <label for="gateway-cidr">IPv4 subnet / CIDR (required, e.g. 192.168.10.0/24)</label>
-                <input id="gateway-cidr" name="cidr" maxlength="64" required>
-              </div>
-              <div class="gateway-field">
-                <label for="gateway-router-name">Router name (optional)</label>
-                <input id="gateway-router-name" name="router_name" maxlength="120">
-              </div>
             </div>
-            <div><button type="submit">Save gateway</button></div>
+            <p class="muted">Only the room and gateway IP are needed. The subnet is detected automatically as a /24 network.</p>
+            <div><button type="submit">Search and save gateway</button></div>
           </form>
         </details>
       {% endif %}
@@ -119,7 +117,7 @@
                 <thead><tr><th scope="col">IP address</th><th scope="col">Device / PC</th><th scope="col">Room</th><th scope="col">Registration</th></tr></thead>
                 <tbody>
                   {% for host in gateway_scan.clients %}
-                    <tr>
+                    <tr class="detected-pc" ondblclick="inspectDetectedPC(this)" data-ip="{{ host.ip }}" data-name="{{ host.mapped_pc_name or host.source_pc_name or host.hostname or 'Detected PC' }}" data-room="{{ host.room or selected_network.room }}" data-saved="{{ 'true' if host.ip in saved_pc_ips else 'false' }}" title="Double-click to inspect this PC">
                       <td>{{ host.ip }}</td>
                       <td>{{ host.mapped_pc_name or host.source_pc_name or host.hostname or 'Unknown device' }}</td>
                       <td>{{ host.room or 'Not mapped' }}</td>
@@ -162,14 +160,41 @@
         {% endif %}
       </section>
     {% endif %}
+    {% if selected_network %}
+      <section class="pc-view-tools" aria-label="PC viewing controls">
+        <nav class="pc-view-tabs" aria-label="PC views">
+          <a href="{{ url_for('dean_dashboard', network_id=selected_network.id, pc_q=pc_search) }}"{% if pc_view == 'overview' %} aria-current="page"{% endif %}>PCs</a>
+          <a href="{{ url_for('dean_dashboard', network_id=selected_network.id, pc_view='last_opened', pc_q=pc_search) }}"{% if pc_view == 'last_opened' %} aria-current="page"{% endif %}>Last opened</a>
+        </nav>
+        <form class="pc-search" method="get" action="{{ url_for('dean_dashboard') }}">
+          <input type="hidden" name="network_id" value="{{ selected_network.id }}">
+          {% if pc_view == 'last_opened' %}<input type="hidden" name="pc_view" value="last_opened">{% endif %}
+          <input type="search" name="pc_q" value="{{ pc_search }}" placeholder="Search PC name, IP, or lab" aria-label="Search PCs">
+          <button type="submit">Search</button>
+          {% if pc_search %}<a href="{{ url_for('dean_dashboard', network_id=selected_network.id, pc_view=pc_view) }}">Clear</a>{% endif %}
+        </form>
+        {% if pc_view == 'last_opened' %}<p class="muted">Last opened shows the latest agent contact date and the lab mapped to this gateway.</p>{% endif %}
+      </section>
+    {% endif %}
+    <div id="pc-inspection" class="pc-modal" hidden role="dialog" aria-modal="true" aria-labelledby="pc-inspection-title">
+      <div class="pc-modal-card">
+        <button type="button" class="pc-modal-close" onclick="closePCInspection()" aria-label="Close">×</button>
+        <h2 id="pc-inspection-title">PC inspection</h2>
+        <p id="pc-inspection-status" class="muted">Loading deep inspection…</p>
+        <dl id="pc-inspection-details" class="inspection-details"></dl>
+        <pre id="pc-inspection-logs" class="inspection-logs" hidden></pre>
+        <button id="pc-save-from-inspection" type="button" hidden>Save this PC in the system</button>
+      </div>
+    </div>
     <div class="grid">
       {% for pc in pcs %}
-        <div class="pc">
+        <div class="pc detected-pc" ondblclick="inspectDetectedPC(this)" data-ip="{{ pc.lan_ip or '' }}" data-name="{{ pc.name }}" data-room="{{ pc.room or '' }}" data-saved="true" title="Double-click to inspect this PC">
           <b>{{ pc.name }}</b>
           <p class="muted">
             {{ pc.room or 'Room not mapped' }}<br>
             {{ pc.lan_ip or 'No agent IP' }}<br>
-            Last seen: {{ pc.last_agent_seen_at or 'never' }}
+            Gateway: {{ selected_network.gateway_ip if selected_network else 'Not mapped' }}<br>
+            {% if pc_view == 'last_opened' %}Last opened: {{ pc.last_agent_seen_at.strftime('%Y-%m-%d %H:%M') if pc.last_agent_seen_at else 'never' }}{% else %}Last seen: {{ pc.last_agent_seen_at or 'never' }}{% endif %}
           </p>
           {% for command in ['lock', 'restart', 'shutdown', 'wake'] %}
             <form method="post" action="{{ url_for('dean_pc_command') }}" style="display:inline">
@@ -193,5 +218,42 @@
       {% endfor %}
     </div>
   </main>
+  <script>
+    const inspectionUrl = "{{ url_for('inspect_discovered_pc') }}";
+    const saveUrl = "{{ url_for('save_discovered_pcs') }}";
+    const inspectionToken = "{{ network_csrf_token() }}";
+    const selectedNetworkId = "{{ selected_network.id if selected_network else '' }}";
+    let inspectionHost = null;
+    function closePCInspection() { document.getElementById('pc-inspection').hidden = true; }
+    async function inspectDetectedPC(row) {
+      inspectionHost = row;
+      const modal = document.getElementById('pc-inspection');
+      const status = document.getElementById('pc-inspection-status');
+      const details = document.getElementById('pc-inspection-details');
+      const logs = document.getElementById('pc-inspection-logs');
+      const save = document.getElementById('pc-save-from-inspection');
+      modal.hidden = false; details.innerHTML = ''; logs.hidden = true; logs.textContent = '';
+      save.hidden = row.dataset.saved === 'true';
+      status.textContent = 'Searching hardware and recent error logs…';
+      try {
+        const body = new URLSearchParams({ip: row.dataset.ip, network_id: selectedNetworkId, csrf_token: inspectionToken});
+        const response = await fetch(inspectionUrl, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body});
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || 'Inspection failed.');
+        const d = result.diagnostics || {};
+        status.textContent = d.ok ? 'Deep inspection complete.' : (d.error || 'The PC responded without diagnostic data.');
+        const fields = [['PC', result.name], ['IP address', result.ip], ['Room', result.room], ['Motherboard', d.motherboard || d.mainboard || 'Not reported'], ['RAM type', d.ram_type || 'Not reported'], ['RAM capacity', d.ram_capacity || d.ram_size || 'Not reported']];
+        details.innerHTML = fields.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || 'Not reported')}</dd></div>`).join('');
+        if (d.error_logs) { logs.hidden = false; logs.textContent = Array.isArray(d.error_logs) ? d.error_logs.join('\n') : d.error_logs; }
+      } catch (error) { status.textContent = error.message; }
+    }
+    function escapeHtml(value) { return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+    document.getElementById('pc-save-from-inspection').addEventListener('click', () => {
+      if (!inspectionHost) return;
+      const form = document.createElement('form'); form.method = 'post'; form.action = saveUrl;
+      [['network_id', selectedNetworkId], ['selected_ips', inspectionHost.dataset.ip], ['csrf_token', inspectionToken]].forEach(([name, value]) => { const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value; form.appendChild(input); });
+      document.body.appendChild(form); form.submit();
+    });
+  </script>
 </body>
 </html>

@@ -635,6 +635,11 @@ class PC(db.Model):
     last_agent_seen_at = db.Column(db.DateTime, nullable=True)
     online_since_at = db.Column(db.DateTime, nullable=True)
     room = db.Column(db.String(80), nullable=True)
+    motherboard = db.Column(db.String(255), nullable=True)
+    ram_type = db.Column(db.String(80), nullable=True)
+    ram_capacity = db.Column(db.String(80), nullable=True)
+    error_logs = db.Column(db.Text, nullable=True)
+    hardware_scanned_at = db.Column(db.DateTime, nullable=True)
 
 
 class Session(db.Model):
@@ -940,6 +945,16 @@ def ensure_pc_lan_ip_column():
     if "room" not in cols:
         db.session.execute(text("ALTER TABLE pc ADD COLUMN room VARCHAR(80)"))
         db.session.commit()
+    for column, definition in (
+        ("motherboard", "VARCHAR(255)"),
+        ("ram_type", "VARCHAR(80)"),
+        ("ram_capacity", "VARCHAR(80)"),
+        ("error_logs", "TEXT"),
+        ("hardware_scanned_at", "DATETIME"),
+    ):
+        if column not in cols:
+            db.session.execute(text(f"ALTER TABLE pc ADD COLUMN {column} {definition}"))
+            db.session.commit()
 
 
 def ensure_equipment_transaction_columns():
@@ -1071,6 +1086,12 @@ def validate_gateway_network(cidr, gateway_ip):
     if network.prefixlen > 30 or gateway not in network or gateway in {network.network_address, network.broadcast_address}:
         raise ValueError('The gateway must be a usable address inside the subnet.')
     return network, str(gateway)
+
+
+def default_gateway_cidr(gateway_ip):
+    """Use the common /24 campus LAN when the administrator enters only a gateway."""
+    gateway = ipaddress.IPv4Address(gateway_ip)
+    return str(ipaddress.IPv4Network(f'{gateway}/24', strict=False))
 
 
 def room_for_ip(value):
@@ -2306,6 +2327,29 @@ def resolve_pc_targets(pc_name):
     if ":" in host and not host.startswith("["):
         host = f"[{host}]"
     return [f"http://{host}:{port}" for port in ports]
+
+
+def request_pc_diagnostics(ip, port=None):
+    """Ask an installed LAN agent for read-only hardware and recent error data."""
+    host = str(ip or '').strip()
+    if not normalize_ipv4(host):
+        return {'ok': False, 'error': 'invalid PC IP address'}
+    ports = [normalize_agent_port(port), normalize_agent_port(os.getenv('LAN_AGENT_DEFAULT_PORT', '5001')), 5001]
+    for candidate in ports:
+        if not candidate:
+            continue
+        try:
+            req = http_request.Request(
+                f'http://{host}:{candidate}/agent/diagnostics',
+                headers={'X-Agent-Token': get_lan_agent_token()}
+            )
+            with http_request.urlopen(req, timeout=4) as response:
+                payload = json.loads(response.read().decode('utf-8') or '{}')
+            if isinstance(payload, dict) and payload.get('ok', True):
+                return dict(payload, ok=True)
+        except Exception:
+            continue
+    return {'ok': False, 'error': 'The PC agent is offline or does not support deep inspection yet.'}
 
 
 def remote_windows_control_fallback(pc_name, command):
@@ -4940,6 +4984,15 @@ def dean_dashboard():
                 force=request.args.get('refresh') == '1')
     all_pcs = PC.query.order_by(PC.room, PC.name).all()
     pcs = [pc for pc in all_pcs if lan_summary and is_network_client_ip(pc.lan_ip, lan_summary)]
+    pc_view = request.args.get('pc_view', 'overview')
+    if pc_view not in {'overview', 'last_opened'}:
+        pc_view = 'overview'
+    pc_search = request.args.get('pc_q', '').strip()
+    if pc_search:
+        needle = pc_search.casefold()
+        pcs = [pc for pc in pcs if needle in ' '.join((pc.name, pc.lan_ip or '', pc.room or '')).casefold()]
+    if pc_view == 'last_opened':
+        pcs = sorted(pcs, key=lambda pc: pc.last_agent_seen_at or datetime.min, reverse=True)
     saved_pc_ips = {pc.lan_ip for pc in all_pcs if pc.lan_ip}
     online_window_seconds = get_agent_online_window_seconds()
     now_dt = datetime.now()
@@ -4953,7 +5006,7 @@ def dean_dashboard():
     ]
     return render_template('dean.html', pcs=pcs, pc_status_chart=pc_status_chart,
         room_networks=room_networks, selected_network=selected_network, saved_pc_ips=saved_pc_ips,
-        lan_summary=lan_summary, gateway_scan=gateway_scan)
+        lan_summary=lan_summary, gateway_scan=gateway_scan, pc_view=pc_view, pc_search=pc_search)
 
 
 @app.route('/dean/analytics')
@@ -5258,12 +5311,14 @@ def add_room_network():
         abort(403)
     require_network_csrf()
     room = request.form.get('room', '').strip()
-    cidr = request.form.get('cidr', '').strip()
     gateway_ip = request.form.get('gateway_ip', '').strip()
+    cidr = request.form.get('cidr', '').strip()
     router_name = request.form.get('router_name', '').strip()
     try:
         if not room or len(room) > 80 or len(cidr) > 64 or len(gateway_ip) > 64 or len(router_name) > 120:
-            raise ValueError('Enter a room name (up to 80 characters) and valid gateway details.')
+            raise ValueError('Enter a room name and a valid gateway IP.')
+        if not cidr and gateway_ip:
+            cidr = default_gateway_cidr(gateway_ip)
         network, gateway_ip = validate_gateway_network(cidr, gateway_ip)
         for existing in RoomNetwork.query.all():
             if existing.room == room:
@@ -5335,6 +5390,54 @@ def save_discovered_pcs():
             abort(409, description='A PC was saved concurrently. Refresh the page and try again.')
     flash(f'Saved {saved_count} PC(s).' if saved_count else 'The selected PCs are already saved.', 'success')
     return redirect(url_for('dean_dashboard', network_id=room_network.id))
+
+
+@app.route('/admin/pcs/inspect-discovered', methods=['POST'])
+@login_required
+def inspect_discovered_pc():
+    """Deep-inspect a detected PC before the administrator approves it."""
+    if not current_user.is_admin:
+        return jsonify({'ok': False, 'error': 'admin-only endpoint'}), 403
+    require_network_csrf()
+    ip = normalize_ipv4(request.form.get('ip', ''))
+    if not ip:
+        return jsonify({'ok': False, 'error': 'A valid PC IP is required.'}), 400
+    pc = PC.query.filter_by(lan_ip=ip).first()
+    if pc is None:
+        try:
+            network = get_saved_room_network(request.form.get('network_id'))
+            summary = build_saved_ipv4_network_summary(network)
+        except Exception as error:
+            return jsonify({'ok': False, 'error': str(error)}), 400
+        with LAN_SCAN_LOCK:
+            entry = LAN_SCAN_CACHE.get(gateway_scan_key(summary), {})
+            scan = entry.get('result') or {}
+        discovered = {host.get('ip'): host for host in scan.get('clients', [])}
+        if ip not in discovered or not is_network_client_ip(ip, summary):
+            return jsonify({'ok': False, 'error': 'This PC is not in the current gateway discovery result.'}), 409
+        host = discovered[ip]
+        diagnostics = request_pc_diagnostics(ip)
+        return jsonify({'ok': True, 'ip': ip, 'name': host.get('source_pc_name') or host.get('hostname') or 'Detected PC',
+            'room': summary.get('room'), 'saved': False, 'diagnostics': diagnostics})
+
+    diagnostics = request_pc_diagnostics(ip, pc.lan_port)
+    if diagnostics.get('ok'):
+        pc.motherboard = str(diagnostics.get('motherboard') or diagnostics.get('mainboard') or '')[:255] or pc.motherboard
+        pc.ram_type = str(diagnostics.get('ram_type') or '')[:80] or pc.ram_type
+        pc.ram_capacity = str(diagnostics.get('ram_capacity') or diagnostics.get('ram_size') or '')[:80] or pc.ram_capacity
+        logs = diagnostics.get('error_logs')
+        if isinstance(logs, list):
+            logs = '\n'.join(str(item) for item in logs)
+        if logs is not None:
+            pc.error_logs = str(logs)[:20000]
+        pc.hardware_scanned_at = datetime.now()
+        db.session.commit()
+    if not diagnostics.get('ok') and any((pc.motherboard, pc.ram_type, pc.ram_capacity, pc.error_logs)):
+        diagnostics = {'ok': True, 'stored': True, 'motherboard': pc.motherboard,
+            'ram_type': pc.ram_type, 'ram_capacity': pc.ram_capacity,
+            'error_logs': pc.error_logs, 'error': diagnostics.get('error')}
+    return jsonify({'ok': True, 'ip': ip, 'name': pc.name, 'room': pc.room, 'saved': True,
+        'diagnostics': diagnostics, 'stored': diagnostics.get('ok', False)})
 
 
 @app.route('/admin/public_route/start', methods=['POST'])
@@ -6132,6 +6235,17 @@ def api_agent_ack_command():
     touched_pc = PC.query.filter_by(name=cmd.pc_name).first()
     if touched_pc:
         mark_pc_agent_seen(touched_pc)
+        diagnostics = data.get('diagnostics')
+        if isinstance(diagnostics, dict):
+            touched_pc.motherboard = str(diagnostics.get('motherboard') or diagnostics.get('mainboard') or '')[:255] or touched_pc.motherboard
+            touched_pc.ram_type = str(diagnostics.get('ram_type') or '')[:80] or touched_pc.ram_type
+            touched_pc.ram_capacity = str(diagnostics.get('ram_capacity') or diagnostics.get('ram_size') or '')[:80] or touched_pc.ram_capacity
+            logs = diagnostics.get('error_logs')
+            if isinstance(logs, list):
+                logs = '\n'.join(str(item) for item in logs)
+            if logs is not None:
+                touched_pc.error_logs = str(logs)[:20000]
+            touched_pc.hardware_scanned_at = datetime.now()
 
     cmd.status = "done" if ok_flag else "failed"
     cmd.completed_at = datetime.now()

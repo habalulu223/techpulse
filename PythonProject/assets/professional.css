@@ -354,6 +354,18 @@ tr:hover td { background: #fbfcfe; }
 .dash-nav a[aria-current=page] { background: var(--tp-accent) !important; color: #fff !important; font-weight: 700; }
 .dash-nav a i, .dash-nav a svg { color: currentColor !important; -webkit-text-fill-color: currentColor !important; }
 .dash-nav .dash-logout { margin-top: auto; }
+.report-issue-trigger, .issue-modal-close { user-select: none; cursor: pointer; }
+.report-issue-trigger { list-style: none; display: inline-block; padding: 8px 10px; border-radius: 8px; }
+.report-issue-trigger::-webkit-details-marker { display: none; }
+.report-issue-trigger:hover { background: var(--tp-sidebar-hover, rgba(23,107,135,.1)); }
+.report-issue-trigger::after { content: ' ↗'; opacity: 0; margin-left: 4px; transition: opacity .15s ease; }
+.report-issue-trigger:hover::after, .report-issue-trigger:focus-visible::after { opacity: 1; }
+.issue-modal[hidden] { display: none; }
+.issue-modal { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(8, 18, 31, .68); }
+.issue-modal-card { width: min(560px, 100%); max-height: 90vh; overflow: auto; position: relative; padding: 24px; border: 1px solid var(--tp-line); border-radius: 14px; background: var(--tp-surface, #fff); box-shadow: 0 20px 70px rgba(0,0,0,.35); }
+.issue-modal-card form { display: grid; gap: 12px; }
+.issue-modal-card textarea { min-height: 130px; resize: vertical; }
+.issue-modal-close { position: absolute; top: 8px; right: 12px; border: 0; background: transparent !important; color: inherit !important; font-size: 26px; box-shadow: none !important; }
 
 body:has(.dash-nav) { padding-left: var(--tp-nav-w); }
 body:has(.dash-nav) > .top-bar,
