@@ -1,6 +1,8 @@
 @echo off
-REM Quick Start Batch File for Techpuls
-REM This script verifies the environment and runs the Techpuls apps independently
+REM Quick Start Batch File for TechPulse
+REM Verifies the environment and launches the equipment lifecycle applications.
+REM Admin tunnel, PC, gateway, analytics, and mobile pairing functions remain
+REM available from the Admin App after startup.
 
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
@@ -26,7 +28,7 @@ if "%PYTHON_CMD%"=="python" (
 
 echo.
 echo ============================================================
-echo Techpuls - Independent App Quick Start
+echo TechPulse - Equipment Lifecycle Quick Start
 echo ============================================================
 echo.
 

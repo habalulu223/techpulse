@@ -1,0 +1,188 @@
+
+/* TechPulse - system-wide visual refresh (presentation only).
+   Loaded last on every full page. No routes, markup behavior, or scripts changed. */
+:root{
+ --tp-bg:#f1f5f9;--tp-surface:#fff;--tp-ink:#172b43;--tp-muted:#64748b;
+ --tp-line:#e2e8f0;--tp-primary:#1769aa;--tp-primary-dark:#104b7d;
+ --tp-navy:#0b1f3a;--tp-navy-2:#102a4c;--tp-shadow:0 8px 24px rgba(15,35,60,.07);
+ --tp-radius:16px;
+}
+html{scroll-behavior:smooth}
+body{font-family:Inter,"Segoe UI",system-ui,sans-serif!important;background:var(--tp-bg)!important;color:var(--tp-ink)!important}
+body:has(.app-header):has(.dash-nav){background:linear-gradient(135deg,#f4f7fb 0%,#edf3f9 100%)!important}
+body:has(.app-header) .app-header{
+ position:sticky!important;top:0!important;z-index:30!important;
+ background:rgba(255,255,255,.94)!important;backdrop-filter:blur(14px);
+ border-bottom:1px solid #e5ebf2!important;box-shadow:0 3px 16px rgba(15,35,60,.045)!important;
+ min-height:76px!important
+}
+.app-header-inner{max-width:1600px!important;min-height:76px!important;padding:12px 30px!important;gap:18px!important}
+.app-header-brand{font-weight:850!important;letter-spacing:-.7px!important;color:#123a5b!important}
+.app-header-title{font-size:24px!important;font-weight:800!important;letter-spacing:-.6px!important}
+.app-header-sub{margin-top:3px!important;color:#718096!important}
+.app-header-user{background:#f1f5f9!important;border:1px solid #e2e8f0!important;border-radius:999px!important;padding:9px 13px!important;font-weight:650!important}
+.header-action-button{border-radius:10px!important;padding:10px 14px!important;font-weight:700!important}
+.profile-avatar-link{border:2px solid #dbeafe!important;box-shadow:0 2px 8px #0f274018!important}
+.dash-nav{
+ background:linear-gradient(180deg,#0b1f3a 0%,#102a4c 55%,#0b2543 100%)!important;
+ border-right:1px solid rgba(255,255,255,.08)!important;box-shadow:8px 0 28px rgba(10,31,58,.10)!important;
+ padding:24px 15px 20px!important
+}
+.dash-brand{font-size:24px!important;font-weight:850!important;letter-spacing:-.8px!important;color:#fff!important;padding:5px 13px 25px!important}
+.dash-nav-group-label{color:#8da8c3!important;font-size:10px!important;letter-spacing:1.2px!important;font-weight:800!important;text-transform:uppercase!important;padding:17px 13px 8px!important}
+.dash-nav a:not(.dash-brand){display:flex!important;align-items:center!important;gap:12px!important;margin:3px 0!important;padding:11px 13px!important;border-radius:11px!important;color:#d4e0ed!important;font-weight:600!important;transition:background .18s ease,transform .18s ease!important}
+.dash-nav a:not(.dash-brand) i{width:19px!important;text-align:center!important;color:#9db8d2!important}
+.dash-nav a:not(.dash-brand):hover{background:rgba(255,255,255,.09)!important;color:#fff!important;transform:translateX(2px)}
+.dash-nav a[aria-current="page"]{background:linear-gradient(100deg,#1769aa,#2384d4)!important;color:#fff!important;box-shadow:0 6px 16px rgba(0,93,170,.28)!important}
+.dash-nav a[aria-current="page"] i{color:#fff!important}
+.dash-nav .dash-logout{margin-top:20px!important;border:1px solid rgba(255,255,255,.12)!important;color:#ffd6d6!important}
+body:has(.app-header):has(.dash-nav) main{max-width:1600px!important;padding:30px clamp(18px,3vw,42px)!important}
+body:has(.app-header):has(.dash-nav) main>*+*{margin-top:22px!important}
+body:has(.app-header):has(.dash-nav) h1{font-size:clamp(23px,2vw,30px)!important;font-weight:800!important;letter-spacing:-.7px!important}
+body:has(.app-header):has(.dash-nav) h2{font-size:18px!important;font-weight:750!important}
+.card,.panel,.stat,.metric,.section,article,.analytics-card,.section-card,.catalog-panel,.pairing-card,.qr-card,.error-card,.register-box,.login-box{
+ border:1px solid #e3eaf2!important;border-radius:16px!important;box-shadow:var(--tp-shadow)!important
+}
+.card,.panel,.stat,.metric,.analytics-card,.section-card,.catalog-panel{padding:20px!important}
+.stats{gap:16px!important}
+.stat,.metric,.analytics-tile{transition:transform .18s ease,box-shadow .18s ease!important}
+.stat:hover,.metric:hover,.analytics-tile:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(15,35,60,.10)!important}
+button,.btn,input[type=submit],.button,.primary-button{
+ border-radius:10px!important;font-weight:700!important;transition:transform .16s ease,box-shadow .16s ease,background .16s ease!important
+}
+button:hover,.btn:hover,input[type=submit]:hover,.button:hover,.primary-button:hover{transform:translateY(-1px);box-shadow:0 7px 16px rgba(23,105,170,.18)}
+input:not([type=checkbox]):not([type=radio]),select,textarea{
+ border:1px solid #d7e1ec!important;border-radius:10px!important;background:#fff!important;
+ min-height:42px;box-shadow:inset 0 1px 2px rgba(15,35,60,.025)!important
+}
+input:focus,select:focus,textarea:focus{outline:0!important;border-color:#4b9bd7!important;box-shadow:0 0 0 3px rgba(35,132,212,.13)!important}
+table{border-collapse:separate!important;border-spacing:0!important;width:100%}
+thead th{background:#f3f7fb!important;color:#52677e!important;font-size:11px!important;letter-spacing:.65px!important;text-transform:uppercase!important;font-weight:800!important;border-bottom:1px solid #e2e8f0!important}
+th,td{padding:13px 15px!important;border-bottom:1px solid #edf1f5!important}
+tbody tr:hover{background:#f7fbff!important}
+.badge,.status,.pill{border-radius:999px!important;font-weight:750!important;padding:5px 10px!important}
+a{transition:color .15s ease,background .15s ease!important}
+img{max-width:100%}
+:focus-visible{outline:3px solid rgba(35,132,212,.45)!important;outline-offset:2px!important}
+/* Public/auth pages */
+body.login-intro,body:has(.register-box),body:has(.qr-card),body:has(.error-card){
+ background:radial-gradient(ellipse at 15% 15%,rgba(36,132,212,.20),transparent 38%),
+ linear-gradient(135deg,#091c34 0%,#102e50 58%,#124c69 100%)!important;
+ min-height:100vh!important
+}
+.login-shell,.register-box,.qr-card,.error-card{
+ background:rgba(255,255,255,.97)!important;border:1px solid rgba(255,255,255,.45)!important;
+ border-radius:22px!important;box-shadow:0 24px 70px rgba(0,0,0,.24)!important
+}
+.login-box,.register-box{padding:clamp(26px,4vw,42px)!important}
+.login-box h1,.register-box h1{font-weight:850!important;letter-spacing:-.8px!important;color:#102a46!important}
+.login-box button,.register-box button,.qr-card button,.error-card .actions a{background:linear-gradient(100deg,#1769aa,#2186c9)!important;color:#fff!important;border:0!important}
+.login-back{color:#fff!important;background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:10px!important;padding:10px 14px!important}
+body:has(.topbar) {background:#f3f6fa!important}
+.topbar{background:rgba(255,255,255,.94)!important;backdrop-filter:blur(12px);border-bottom:1px solid #e4eaf1!important;box-shadow:0 3px 18px rgba(15,35,60,.05)!important}
+.topbar .brand{font-weight:850!important;letter-spacing:-.7px!important}
+.hero{padding-top:clamp(60px,9vw,110px)!important;padding-bottom:clamp(60px,8vw,96px)!important}
+.hero h1{font-weight:850!important;letter-spacing:-1.4px!important;line-height:1.08!important}
+.hero-copy{color:#52677e!important;line-height:1.8!important}
+.qr-card,.error-card{margin:clamp(24px,7vh,70px) auto!important;padding:clamp(24px,4vw,42px)!important}
+@media(max-width:900px){
+ .app-header-inner{padding:12px 16px!important;flex-wrap:wrap!important}
+ body:has(.app-header):has(.dash-nav){padding-left:0!important}
+ .dash-nav{position:relative!important;width:100%!important;height:auto!important;max-height:none!important}
+ body:has(.app-header):has(.dash-nav) main{padding:18px!important}
+ .app-header-user{display:none!important}
+}
+@media(max-width:600px){
+ .app-header-title{font-size:20px!important}
+ .app-header-inner{gap:10px!important}
+ main{padding:16px!important}
+ .stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ table{display:block;overflow-x:auto;white-space:nowrap}
+}
+
+/* Dashboard chrome: keep the header visually continuous with the sidebar and
+   allow long labels/content to wrap instead of being clipped. */
+body:has(.app-header):has(.dash-nav) .app-header {
+ background:linear-gradient(180deg,#0b1f3a 0%,#102a4c 55%,#0b2543 100%)!important;
+ border-bottom:1px solid rgba(255,255,255,.10)!important;
+ box-shadow:0 6px 18px rgba(10,31,58,.16)!important;
+}
+body:has(.app-header):has(.dash-nav) .app-header-brand,
+body:has(.app-header):has(.dash-nav) .app-header-title {
+ color:#fff!important;
+ -webkit-text-fill-color:#fff!important;
+}
+body:has(.app-header):has(.dash-nav) .app-header-sub {
+ color:#b9c9da!important;
+ -webkit-text-fill-color:#b9c9da!important;
+}
+body:has(.app-header):has(.dash-nav) .app-header-user {
+ background:rgba(255,255,255,.10)!important;
+ border-color:rgba(255,255,255,.18)!important;
+ color:#e5eef7!important;
+ -webkit-text-fill-color:#e5eef7!important;
+}
+body:has(.app-header):has(.dash-nav) .header-action-button {
+ background:#1769aa!important;
+ border-color:#2384d4!important;
+ color:#fff!important;
+}
+body:has(.app-header):has(.dash-nav) .header-action-button:hover {
+ background:#2384d4!important;
+ border-color:#4b9bd7!important;
+}
+body:has(.app-header):has(.dash-nav) .profile-avatar-link {
+ background:rgba(255,255,255,.12)!important;
+ border-color:rgba(255,255,255,.28)!important;
+ color:#fff!important;
+}
+body:has(.app-header):has(.dash-nav) .profile-avatar-link * {
+ color:#fff!important;
+ -webkit-text-fill-color:#fff!important;
+}
+
+/* Do not crop headings, labels, table cells, or card copy when a function has
+   longer data. Tables retain their intentional horizontal scrolling. */
+body:has(.app-header):has(.dash-nav) :is(h1,h2,h3,h4,p,li,dt,dd,label,legend,caption,td,th,a,button,summary) {
+ overflow-wrap:anywhere;
+}
+body:has(.app-header):has(.dash-nav) :is(.card,.panel,.section,article,.stat,.metric,.analytics-card,.section-card) {
+ overflow:visible;
+}
+body:has(.app-header):has(.dash-nav) main,
+body:has(.app-header):has(.dash-nav) .app-header-inner,
+body:has(.app-header):has(.dash-nav) .app-header-heading,
+body:has(.app-header):has(.dash-nav) .app-header-titles,
+body:has(.app-header):has(.dash-nav) .app-header-actions {
+ min-width:0;
+}
+body:has(.app-header):has(.dash-nav) .app-header-inner {
+ min-height:76px!important;
+ height:auto!important;
+}
+
+/* Keep the navigation usable, but remove the scrollbar chrome from the design. */
+.dash-nav {
+ scrollbar-width:none!important;
+ -ms-overflow-style:none!important;
+}
+.dash-nav::-webkit-scrollbar {
+ width:0!important;
+ height:0!important;
+ display:none!important;
+}
+
+/* Dashboard pages: remove the browser scrollbar chrome without disabling page
+   scrolling for long dashboards. */
+html:has(.app-header):has(.dash-nav),
+body:has(.app-header):has(.dash-nav) {
+ scrollbar-width:none!important;
+ -ms-overflow-style:none!important;
+}
+html:has(.app-header):has(.dash-nav)::-webkit-scrollbar,
+body:has(.app-header):has(.dash-nav)::-webkit-scrollbar {
+ width:0!important;
+ height:0!important;
+ display:none!important;
+}
+

@@ -3146,7 +3146,7 @@ def get_mobile_user_from_token():
 
 
 def get_mobile_equipment_user_from_token():
-    """Equipment access additionally requires a staff or borrowing role."""
+    """Equipment access supports borrower and authorized staff scanner flows."""
     user, error = get_mobile_user_from_token()
     if error:
         return None, error
@@ -3192,30 +3192,6 @@ def get_mobile_updates_feed():
             "timestamp": timestamp
         }
     ]
-
-
-def build_mobile_assistant_response(user, message):
-    text_value = str(message or "").strip()
-    lowered = text_value.lower()
-
-    now_dt = datetime.now()
-
-    if any(term in lowered for term in ("pc", "pcs", "available", "computer")):
-        pcs = PC.query.order_by(PC.id.asc()).all()
-        available_count = sum(1 for pc in pcs if not get_pc_usage_state(pc, now_dt=now_dt)["in_use"])
-        return f"There are {available_count} available PC(s) right now."
-
-    active_session = Session.query.filter_by(user_id=user.id, end_time=None).order_by(Session.start_time.desc()).first()
-    if any(term in lowered for term in ("session", "playing", "time")):
-        if active_session and active_session.start_time:
-            elapsed = max((now_dt - active_session.start_time).total_seconds(), 0)
-            return f"Your session has been running for {format_duration_compact(elapsed)}."
-        return "You do not have an active session right now."
-
-    return (
-        "I can help with available PCs and session status. "
-        "Try asking about either of those."
-    )
 
 
 @app.before_request
@@ -3471,6 +3447,32 @@ def api_mobile_equipment_borrow_request(equipment_id):
         "message": "Borrow request sent for approval."}), 201
 
 
+@app.route('/api/mobile/equipment/<int:equipment_id>/issue', methods=['POST'])
+def api_mobile_equipment_issue(equipment_id):
+    """Submit a mobile equipment concern for authorized staff verification."""
+    user, error = get_mobile_equipment_user_from_token()
+    if error:
+        return error
+    item = db.session.get(CommunityEquipment, equipment_id)
+    title = str(get_request_value('issue_title', '')).strip()
+    description = str(get_request_value('issue_description', '')).strip()
+    if not item or not title or not description:
+        return jsonify({"ok": False, "error": "Issue title and description are required."}), 400
+    identity = ensure_community_user(user)
+    issue = CommunityIssue(
+        equipment_id=item.equipment_id,
+        reported_by=identity.user_id,
+        issue_title=title,
+        issue_description=description,
+    )
+    db.session.add(issue)
+    db.session.flush()
+    change_community_equipment_status(item, 'Under Maintenance', user, f'Issue reported: {title}')
+    community_audit('Reported equipment issue', 'issues', issue.issue_id, new_value=title, actor=identity)
+    db.session.commit()
+    return jsonify({"ok": True, "message": "Issue report submitted for verification."}), 201
+
+
 @app.route('/api/mobile/login', methods=['POST'])
 def api_mobile_login():
     username = str(get_request_value("username", "")).strip()
@@ -3483,6 +3485,8 @@ def api_mobile_login():
         return jsonify({"ok": False, "error": "Invalid credentials"}), 401
     if user.is_admin:
         return jsonify({"ok": False, "error": "Admin accounts are not supported by the mobile client"}), 403
+    if user.role not in {"student", "instructor"}:
+        return jsonify({"ok": False, "error": "The mobile borrower app is available only to students and instructors."}), 403
 
     return jsonify({
         "ok": True,
@@ -3495,6 +3499,50 @@ def api_mobile_login():
         "access_token": create_mobile_api_token(user),
         "app_version": APP_VERSION
     }), 200
+
+
+@app.route('/api/mobile/register', methods=['POST'])
+def api_mobile_register():
+    """Create a borrower account in the server's main and dedicated auth databases."""
+    username = str(get_request_value("username", "")).strip()
+    full_name = str(get_request_value("full_name", "")).strip()
+    password = str(get_request_value("password", ""))
+    role = str(get_request_value("role", "student")).strip().lower()
+
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{3,80}", username):
+        return jsonify({"ok": False, "error": "Username must be 3-80 letters, numbers, dots, underscores, or hyphens."}), 400
+    if len(full_name) < 2 or len(full_name) > 160:
+        return jsonify({"ok": False, "error": "Enter your full name."}), 400
+    if len(password) < 8:
+        return jsonify({"ok": False, "error": "Password must be at least 8 characters."}), 400
+    if role not in {"student", "instructor"}:
+        return jsonify({"ok": False, "error": "Borrower accounts can only be students or instructors."}), 400
+    if User.query.filter_by(username=username).first() or AuthUser.query.filter_by(username=username).first():
+        return jsonify({"ok": False, "error": "That username is already in use."}), 409
+
+    try:
+        user = User(username=username, full_name=full_name, role=role)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.flush()
+        upsert_auth_credentials(user)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"ok": False, "error": "That username is already in use."}), 409
+
+    return jsonify({
+        "ok": True,
+        "user_id": user.id,
+        "username": user.username,
+        "full_name": user.full_name,
+        "role": user.role,
+        "can_manage_equipment": False,
+        "can_borrow_equipment": True,
+        "access_token": create_mobile_api_token(user),
+        "app_version": APP_VERSION,
+        "message": "Borrower account created."
+    }), 201
 
 
 @app.route('/api/mobile/pcs', methods=['GET'])
@@ -3608,22 +3656,6 @@ def api_mobile_profile():
         return jsonify({"ok": True, "message": "Profile picture removed."}), 200
 
     return jsonify({"ok": False, "error": "Unsupported profile action."}), 400
-
-
-@app.route('/api/mobile/ai-chat', methods=['POST'])
-def api_mobile_ai_chat():
-    user, error = get_mobile_user_from_token()
-    if error:
-        return error
-
-    message = str(get_request_value("message", "")).strip()
-    if not message:
-        return jsonify({"ok": False, "error": "message is required"}), 400
-
-    return jsonify({
-        "ok": True,
-        "response": build_mobile_assistant_response(user, message)
-    }), 200
 
 
 @app.route('/favicon.ico')

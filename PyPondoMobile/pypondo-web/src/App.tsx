@@ -32,23 +32,9 @@ type LoginPayload = {
   ok: boolean
   user_id: number
   username: string
-  balance: number
   access_token: string
   app_version: string
   error?: string
-}
-
-type MobileBooking = {
-  id?: number
-  pc_name: string
-  date: string
-  time: string
-  status: string
-}
-
-type BookingPayload = {
-  ok: boolean
-  bookings: MobileBooking[]
 }
 
 type MobileProfile = {
@@ -56,17 +42,19 @@ type MobileProfile = {
   username: string
   full_name: string
   role: string
-  balance: number
   has_profile_picture: boolean
 }
 
 type ProfilePayload = { ok: boolean; profile: MobileProfile | null }
 
 type ScannedEquipment = {
+  equipment_id: number
   equipment_code: string
   equipment_name: string
   category?: string | null
   status: string
+  is_available?: boolean
+  can_request?: boolean
 }
 
 type EquipmentPayload = { ok: boolean; equipment: ScannedEquipment }
@@ -97,37 +85,17 @@ type UpdatesPayload = {
   updates: MobileUpdate[]
 }
 
-type TopupPayload = {
-  ok: boolean
-  message: string
-  external_id: string
-  amount: number
-  balance: number
-}
-
-type AssistantPayload = {
-  ok: boolean
-  response: string
-}
-
 type ConnectionStatus = 'idle' | 'testing' | 'connected' | 'error'
-type TabKey = 'overview' | 'bookings' | 'pcs' | 'topup' | 'products' | 'profile' | 'assistant' | 'updates'
+type TabKey = 'overview' | 'pcs' | 'equipment' | 'profile' | 'updates'
 
 type StoredConfig = {
   serverAddress: string
 }
 
 type StoredSession = {
-  balance: number
   userId: number
   username: string
   accessToken: string
-}
-
-type ChatMessage = {
-  id: number
-  role: 'assistant' | 'system' | 'user'
-  text: string
 }
 
 type ScannerStatus = 'idle' | 'starting' | 'active' | 'unsupported' | 'error'
@@ -150,9 +118,10 @@ declare global {
 
 const CONFIG_STORAGE_KEY = 'pypondo.mobile.config.v2'
 const SESSION_STORAGE_KEY = 'pypondo.mobile.session.v2'
-const DEFAULT_SERVER_ADDRESS = 'https://cybercore'
+// The APK is self-contained, but authentication still needs a TechPulse server.
+// Keep this blank so the app never waits on a guessed hostname during startup.
+const DEFAULT_SERVER_ADDRESS = ''
 const DEFAULT_SERVER_PORT = 5000
-const QUICK_TOPUP_AMOUNTS = [100, 200, 500, 1000]
 const QR_PAIRING_PATH_PATTERN = /\/api\/mobile\/pairing\/?$/i
 
 // Map an equipment/PC status string to a pill color class: green for
@@ -167,40 +136,23 @@ function statusPillClass(status: string): string {
 const QR_SCAN_INTERVAL_MS = 300
 const DEFAULT_SCANNER_MESSAGE =
   'Point the camera at the pairing QR from your desktop to connect over LAN or a public route.'
-const DEFAULT_PRODUCT_SCANNER_MESSAGE = 'Sign in, then point the camera at an equipment QR code to view basic item information.'
+const DEFAULT_PRODUCT_SCANNER_MESSAGE = 'Sign in, then point the camera at an equipment QR code to view its record.'
 const TAB_META: Record<TabKey, { label: string; hint: string }> = {
   overview: {
     label: 'Overview',
-    hint: 'Session status, bookings, and rollout notes.',
-  },
-  bookings: {
-    label: 'Bookings',
-    hint: 'Reserve a machine and track existing schedules.',
+    hint: 'Connection status, equipment, and rollout notes.',
   },
   pcs: {
     label: 'PCs',
     hint: 'Live station availability and LAN registration.',
   },
-  topup: {
-    label: 'Top-up',
-    hint: 'Create a balance request from the phone.',
-  },
-  products: { label: 'Scan item', hint: 'Scan equipment QR codes to view basic item information.' },
+  equipment: { label: 'Equipment', hint: 'Scan equipment QR codes to view item information.' },
   profile: { label: 'Profile', hint: 'Account details, profile picture, and password.' },
-  assistant: {
-    label: 'Assistant',
-    hint: 'Ask about account activity and cafe operations.',
-  },
   updates: {
     label: 'Updates',
     hint: 'Product notices and release history.',
   },
 }
-
-const currencyFormatter = new Intl.NumberFormat('en-PH', {
-  currency: 'PHP',
-  style: 'currency',
-})
 
 function buildBaseUrl(serverAddress: string) {
   const trimmed = serverAddress.trim()
@@ -323,21 +275,32 @@ async function resolveQrServerAddress(rawValue: string) {
 }
 
 async function readJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, init)
-  const raw = await response.text()
-  const data = raw ? JSON.parse(raw) : {}
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), 8000)
+  try {
+    const response = await fetch(input, { ...init, signal: init?.signal || controller.signal })
+    const raw = await response.text()
+    const data = raw ? JSON.parse(raw) : {}
 
-  if (!response.ok) {
-    const message =
-      typeof data?.error === 'string'
-        ? data.error
-        : typeof data?.message === 'string'
-          ? data.message
-          : `Request failed with status ${response.status}.`
-    throw new Error(message)
+    if (!response.ok) {
+      const message =
+        typeof data?.error === 'string'
+          ? data.error
+          : typeof data?.message === 'string'
+            ? data.message
+            : `Request failed with status ${response.status}.`
+      throw new Error(message)
+    }
+
+    return data as T
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('The TechPulse server did not respond within 8 seconds. Check the address and network.')
+    }
+    throw error
+  } finally {
+    window.clearTimeout(timeoutId)
   }
-
-  return data as T
 }
 
 function createFormBody(values: Record<string, string | number>) {
@@ -346,10 +309,6 @@ function createFormBody(values: Record<string, string | number>) {
     body.set(key, String(value))
   })
   return body.toString()
-}
-
-function formatCurrency(amount: number) {
-  return currencyFormatter.format(Number.isFinite(amount) ? amount : 0)
 }
 
 function formatTimestamp(value?: string) {
@@ -406,8 +365,6 @@ function readStoredSession(): StoredSession | null {
       return null
     }
     if (
-      !('balance' in storedSession) ||
-      typeof storedSession.balance !== 'number' ||
       !('userId' in storedSession) ||
       typeof storedSession.userId !== 'number' ||
       !('username' in storedSession) ||
@@ -418,7 +375,6 @@ function readStoredSession(): StoredSession | null {
     }
     return {
       accessToken: storedSession.accessToken,
-      balance: storedSession.balance,
       userId: storedSession.userId,
       username: storedSession.username,
     }
@@ -437,11 +393,11 @@ function writeStoredSession(session: StoredSession | null) {
 }
 
 function App() {
-  const [serverAddress, setServerAddress] = useState(DEFAULT_SERVER_ADDRESS)
+  const [serverAddress, setServerAddress] = useState(() => readStoredConfig()?.serverAddress || DEFAULT_SERVER_ADDRESS)
   const [baseUrl, setBaseUrl] = useState('')
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle')
   const [connectionMessage, setConnectionMessage] = useState(
-    'Auto-detecting the Techpuls server on this network...',
+    'Enter the TechPulse server address or scan the pairing QR code.',
   )
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -465,13 +421,15 @@ function App() {
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [creatingAccount, setCreatingAccount] = useState(false)
+  const [accountFullName, setAccountFullName] = useState('')
+  const [accountRole, setAccountRole] = useState<'student' | 'instructor'>('student')
   const [loginBusy, setLoginBusy] = useState(false)
-  const [session, setSession] = useState<StoredSession | null>(null)
+  const [session, setSession] = useState<StoredSession | null>(() => readStoredSession())
 
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [refreshBusy, setRefreshBusy] = useState(false)
   const [lastSync, setLastSync] = useState('')
-  const [bookings, setBookings] = useState<MobileBooking[]>([])
   const [pcs, setPcs] = useState<MobilePc[]>([])
   const [updates, setUpdates] = useState<MobileUpdate[]>([])
   const [scannedEquipment, setScannedEquipment] = useState<ScannedEquipment | null>(null)
@@ -482,42 +440,15 @@ function App() {
   const [picturePassword, setPicturePassword] = useState('')
   const [newProfilePassword, setNewProfilePassword] = useState('')
   const [profileBusy, setProfileBusy] = useState(false)
-  const [assistantMessages, setAssistantMessages] = useState<ChatMessage[]>([
-    {
-      id: 1,
-      role: 'system',
-      text: 'Connected apps use the existing Techpuls mobile API. No localhost dev server is required inside the APK.',
-    },
-  ])
-
-  const [selectedPcId, setSelectedPcId] = useState('')
-  const [bookingDate, setBookingDate] = useState('')
-  const [bookingTime, setBookingTime] = useState('')
-  const [bookingBusy, setBookingBusy] = useState(false)
-
-  const [topupAmount, setTopupAmount] = useState('200')
-  const [topupBusy, setTopupBusy] = useState(false)
-
-  const [assistantInput, setAssistantInput] = useState('')
-  const [assistantBusy, setAssistantBusy] = useState(false)
-
+  const [borrowPurpose, setBorrowPurpose] = useState('')
+  const [expectedReturn, setExpectedReturn] = useState('')
+  const [requestBusy, setRequestBusy] = useState(false)
+  const [issueTitle, setIssueTitle] = useState('')
+  const [issueDescription, setIssueDescription] = useState('')
+  const [issueBusy, setIssueBusy] = useState(false)
   useEffect(() => {
-    const storedConfig = readStoredConfig()
-    const storedSession = readStoredSession()
-
-    if (storedConfig?.serverAddress) {
-      setServerAddress(storedConfig.serverAddress)
-      void connectToServer(storedConfig.serverAddress, true).then((connected) => {
-        if (!connected) {
-          void startServerDiscovery(true)
-        }
-      })
-    } else {
-      void startServerDiscovery(true)
-    }
-
-    if (storedSession) {
-      setSession(storedSession)
+    if (serverAddress) {
+      void connectToServer(serverAddress, true)
     }
   }, [])
 
@@ -605,7 +536,7 @@ function App() {
         `/api/mobile/equipment/scan?qr=${encodeURIComponent(rawValue)}`,
       )
       setScannedEquipment(payload.equipment)
-      setActiveTab('products')
+      setActiveTab('equipment')
       setConnectionMessage(`Loaded ${payload.equipment.equipment_name}.`)
       return null
     } catch (error) {
@@ -623,6 +554,56 @@ function App() {
       return
     }
     setManualCode('')
+  }
+
+  async function submitBorrowRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!session || !scannedEquipment) return
+    if (!borrowPurpose.trim() || !expectedReturn) {
+      setConnectionMessage('Enter the borrowing purpose and expected return date.')
+      return
+    }
+    setRequestBusy(true)
+    try {
+      const payload = await apiFetch<{ ok: boolean; message: string }>(
+        `/api/mobile/equipment/${scannedEquipment.equipment_id}/request`,
+        {
+          body: createFormBody({ purpose: borrowPurpose, expected_return_date: expectedReturn }),
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          method: 'POST',
+        },
+      )
+      setConnectionMessage(payload.message)
+      setBorrowPurpose('')
+      setExpectedReturn('')
+    } catch (error) {
+      setConnectionMessage(error instanceof Error ? error.message : 'Could not send the borrow request.')
+    } finally {
+      setRequestBusy(false)
+    }
+  }
+
+  async function submitEquipmentIssue(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!session || !scannedEquipment) return
+    setIssueBusy(true)
+    try {
+      const payload = await apiFetch<{ ok: boolean; message: string }>(
+        `/api/mobile/equipment/${scannedEquipment.equipment_id}/issue`,
+        {
+          body: createFormBody({ issue_title: issueTitle, issue_description: issueDescription }),
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          method: 'POST',
+        },
+      )
+      setConnectionMessage(payload.message)
+      setIssueTitle('')
+      setIssueDescription('')
+    } catch (error) {
+      setConnectionMessage(error instanceof Error ? error.message : 'Could not submit the issue report.')
+    } finally {
+      setIssueBusy(false)
+    }
   }
 
   async function applyScannedQr(rawValue: string) {
@@ -815,7 +796,6 @@ function App() {
 
   const availablePcs = pcs.filter((pc) => !pc.is_occupied)
   const onlinePcCount = pcs.filter((pc) => pc.online).length
-  const nextBooking = bookings[0] ?? null
   const latestUpdate = updates[0] ?? null
   const serverAddressSummary = serverInfo
     ? serverInfo.server_address || `${serverInfo.server_ip}:${serverInfo.server_port}`
@@ -925,12 +905,9 @@ function App() {
     setRefreshBusy(true)
 
     try {
-      const [pcsPayload, updatesPayload, bookingsPayload, profilePayload] = await Promise.all([
+      const [pcsPayload, updatesPayload, profilePayload] = await Promise.all([
         apiFetch<PcsPayload>('/api/mobile/pcs'),
         apiFetch<UpdatesPayload>('/api/mobile/updates'),
-        session
-          ? apiFetch<BookingPayload>('/api/mobile/bookings')
-          : Promise.resolve<BookingPayload>({ ok: true, bookings: [] }),
         session
           ? apiFetch<ProfilePayload>('/api/mobile/profile')
           : Promise.resolve<ProfilePayload>({ ok: true, profile: null }),
@@ -939,16 +916,8 @@ function App() {
       startTransition(() => {
         setPcs(pcsPayload.pcs ?? [])
         setUpdates(updatesPayload.updates ?? [])
-        setBookings(bookingsPayload.bookings ?? [])
         setProfile(profilePayload.profile)
       })
-
-      if (!selectedPcId && pcsPayload.pcs.length > 0) {
-        const firstAvailable = pcsPayload.pcs.find((pc) => !pc.is_occupied)
-        if (firstAvailable) {
-          setSelectedPcId(String(firstAvailable.id))
-        }
-      }
 
       setLastSync(new Date().toISOString())
     } catch (error) {
@@ -1023,15 +992,24 @@ function App() {
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!baseUrl) {
-      await connectToServer()
-    }
-
-    const candidateBaseUrl = baseUrl || buildBaseUrl(serverAddress)
     if (!username.trim() || !password.trim()) {
       setConnectionMessage('Enter both username and password.')
       return
     }
+
+    if (!baseUrl) {
+      const address = serverAddress.trim()
+      if (!address) {
+        setConnectionMessage('Connect to the TechPulse server or scan the pairing QR code before signing in.')
+        return
+      }
+      const connected = await connectToServer(address)
+      if (!connected) {
+        return
+      }
+    }
+
+    const candidateBaseUrl = baseUrl || buildBaseUrl(serverAddress)
 
     setLoginBusy(true)
 
@@ -1049,7 +1027,6 @@ function App() {
 
       const nextSession: StoredSession = {
         accessToken: payload.access_token,
-        balance: payload.balance,
         userId: payload.user_id,
         username: payload.username,
       }
@@ -1066,10 +1043,55 @@ function App() {
     }
   }
 
+  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!accountFullName.trim() || !username.trim() || password.length < 8) {
+      setConnectionMessage('Enter your full name, a username, and a password of at least 8 characters.')
+      return
+    }
+    if (!baseUrl) {
+      const address = serverAddress.trim()
+      if (!address) {
+        setConnectionMessage('Connect to the TechPulse server or scan the pairing QR code before creating an account.')
+        return
+      }
+      const connected = await connectToServer(address)
+      if (!connected) return
+    }
+
+    setLoginBusy(true)
+    try {
+      const payload = await readJson<LoginPayload>(`${baseUrl || buildBaseUrl(serverAddress)}/api/mobile/register`, {
+        body: createFormBody({
+          full_name: accountFullName,
+          password,
+          role: accountRole,
+          username,
+        }),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        method: 'POST',
+      })
+      const nextSession: StoredSession = {
+        accessToken: payload.access_token,
+        userId: payload.user_id,
+        username: payload.username,
+      }
+      setSession(nextSession)
+      writeStoredSession(nextSession)
+      setPassword('')
+      setAccountFullName('')
+      setConnectionMessage(`Account created. Signed in as ${payload.username}.`)
+      setActiveTab('overview')
+    } catch (error) {
+      setConnectionMessage(error instanceof Error ? error.message : 'Account creation failed.')
+    } finally {
+      setLoginBusy(false)
+    }
+  }
+
   function handleLogout() {
     setSession(null)
     writeStoredSession(null)
-    setBookings([])
     setProfile(null)
     setCurrentProfilePassword('')
     setPicturePassword('')
@@ -1077,153 +1099,12 @@ function App() {
     setConnectionMessage('Signed out on this device.')
   }
 
-  async function submitBooking(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!session) {
-      setConnectionMessage('Sign in before creating a booking.')
-      return
-    }
-
-    if (!selectedPcId || !bookingDate || !bookingTime) {
-      setConnectionMessage('Choose a PC, booking date, and booking time.')
-      return
-    }
-
-    setBookingBusy(true)
-
-    try {
-      await apiFetch('/api/mobile/book', {
-        body: createFormBody({
-          date: bookingDate,
-          pc_id: selectedPcId,
-          time: bookingTime,
-        }),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        method: 'POST',
-      })
-
-      setConnectionMessage('Booking saved successfully.')
-      await refreshData()
-    } catch (error) {
-      setConnectionMessage(error instanceof Error ? error.message : 'Booking failed.')
-    } finally {
-      setBookingBusy(false)
-    }
-  }
-
-  async function submitTopup(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!session) {
-      setConnectionMessage('Sign in before creating a top-up request.')
-      return
-    }
-
-    const parsedAmount = Number(topupAmount)
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      setConnectionMessage('Enter a valid top-up amount.')
-      return
-    }
-
-    setTopupBusy(true)
-
-    try {
-      const payload = await apiFetch<TopupPayload>('/api/mobile/topup', {
-        body: createFormBody({
-          amount: parsedAmount,
-        }),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        method: 'POST',
-      })
-
-      const nextSession = {
-        ...session,
-        balance: payload.balance,
-      }
-      setSession(nextSession)
-      writeStoredSession(nextSession)
-      setConnectionMessage(payload.message)
-      setActiveTab('overview')
-    } catch (error) {
-      setConnectionMessage(error instanceof Error ? error.message : 'Top-up failed.')
-    } finally {
-      setTopupBusy(false)
-    }
-  }
-
-  async function submitAssistantMessage(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!session) {
-      setConnectionMessage('Sign in before chatting with the assistant.')
-      return
-    }
-
-    const message = assistantInput.trim()
-    if (!message) {
-      return
-    }
-
-    const userMessage: ChatMessage = {
-      id: Date.now(),
-      role: 'user',
-      text: message,
-    }
-
-    startTransition(() => {
-      setAssistantMessages((current) => [...current, userMessage])
-    })
-    setAssistantInput('')
-    setAssistantBusy(true)
-
-    try {
-      const payload = await apiFetch<AssistantPayload>('/api/mobile/ai-chat', {
-        body: createFormBody({
-          message,
-        }),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        method: 'POST',
-      })
-
-      startTransition(() => {
-        setAssistantMessages((current) => [
-          ...current,
-          {
-            id: Date.now() + 1,
-            role: 'assistant',
-            text: payload.response,
-          },
-        ])
-      })
-    } catch (error) {
-      startTransition(() => {
-        setAssistantMessages((current) => [
-          ...current,
-          {
-            id: Date.now() + 1,
-            role: 'system',
-            text: error instanceof Error ? error.message : 'Assistant request failed.',
-          },
-        ])
-      })
-    } finally {
-      setAssistantBusy(false)
-    }
-  }
-
   return (
     <main className="app-shell">
       <section className="hero-card">
         <div className="hero-copy">
           <p className="eyebrow">Techpuls Mobile</p>
-          <h1>Customer operations rebuilt for a real cafe floor.</h1>
+          <h1>Equipment lifecycle access from anywhere on campus.</h1>
           <p className="hero-text">
             The APK carries the customer experience locally, then links it to the live
             Techpuls stack over LAN by QR pairing, direct address, or network discovery.
@@ -1243,9 +1124,9 @@ function App() {
             <span>{serverAddressSummary}</span>
           </div>
           <div className="metric-card">
-            <span className="metric-label">Balance</span>
-            <strong>{session ? formatCurrency(session.balance) : 'Sign in required'}</strong>
-            <span>{session ? session.username : 'Customer account'}</span>
+            <span className="metric-label">Account</span>
+            <strong>{session ? session.username : 'Sign in required'}</strong>
+            <span>{session ? 'Authenticated mobile access' : 'Sign in to view equipment'}</span>
           </div>
           <div className="metric-card">
             <span className="metric-label">Last sync</span>
@@ -1262,9 +1143,9 @@ function App() {
           <span>{connectionMessage}</span>
         </div>
         <div className="ops-card">
-          <span className="metric-label">Next booking</span>
-          <strong>{nextBooking ? `${nextBooking.pc_name} at ${nextBooking.time}` : 'No booking scheduled'}</strong>
-          <span>{nextBooking ? nextBooking.date : 'Create one from the booking tab.'}</span>
+          <span className="metric-label">Equipment access</span>
+          <strong>{session ? 'Ready to scan' : 'Sign in required'}</strong>
+          <span>Scan a QR label to view the equipment record.</span>
         </div>
         <div className="ops-card">
           <span className="metric-label">Cafe floor</span>
@@ -1468,7 +1349,7 @@ function App() {
           <div className="panel-head">
             <div>
               <p className="section-label">Account</p>
-              <h2>{session ? `Signed in as ${session.username}` : 'Customer login'}</h2>
+                <h2>{session ? `Signed in as ${session.username}` : 'TechPulse account login'}</h2>
             </div>
             {session ? (
               <button className="ghost-button" onClick={handleLogout} type="button">
@@ -1481,16 +1362,16 @@ function App() {
             <div className="overview-stack">
               <div className="summary-grid">
                 <div className="summary-card">
-                  <span>Open bookings</span>
-                  <strong>{bookings.length}</strong>
-                </div>
-                <div className="summary-card">
                   <span>Online PCs</span>
                   <strong>{onlinePcCount}</strong>
                 </div>
                 <div className="summary-card">
-                  <span>Current balance</span>
-                  <strong>{formatCurrency(session.balance)}</strong>
+                  <span>Available PCs</span>
+                  <strong>{availablePcs.length}</strong>
+                </div>
+                <div className="summary-card">
+                  <span>Equipment updates</span>
+                  <strong>{updates.length}</strong>
                 </div>
               </div>
 
@@ -1503,7 +1384,7 @@ function App() {
               </div>
 
               <div className="tab-row" role="tablist" aria-label="Mobile app sections">
-                {(['overview', 'bookings', 'pcs', 'topup', 'products', 'profile', 'assistant', 'updates'] as TabKey[]).map((tab) => (
+                {(['overview', 'pcs', 'equipment', 'profile', 'updates'] as TabKey[]).map((tab) => (
                   <button
                     key={tab}
                     className={tab === activeTab ? 'tab-button active' : 'tab-button'}
@@ -1526,39 +1407,13 @@ function App() {
                     <div className="content-card">
                       <h3>Quick actions</h3>
                       <div className="quick-actions-grid">
-                        <button className="ghost-button action-button" onClick={() => setActiveTab('bookings')} type="button">
-                          Book a station
-                        </button>
-                        <button className="ghost-button action-button" onClick={() => setActiveTab('topup')} type="button">
-                          Request top-up
-                        </button>
                         <button className="ghost-button action-button" onClick={() => setActiveTab('pcs')} type="button">
                           Check PCs
                         </button>
                         <button className="ghost-button action-button" disabled={!baseUrl || equipmentScanBusy} onClick={() => void startQrScanner('equipment')} type="button">
                           {equipmentScanBusy ? 'Loading item…' : 'Scan equipment QR'}
                         </button>
-                        <button className="ghost-button action-button" onClick={() => setActiveTab('assistant')} type="button">
-                          Ask assistant
-                        </button>
                       </div>
-                    </div>
-
-                    <div className="content-card">
-                      <h3>Upcoming bookings</h3>
-                      {bookings.length > 0 ? (
-                        bookings.slice(0, 3).map((booking, index) => (
-                          <div className="list-item" key={`${booking.pc_name}-${booking.date}-${index}`}>
-                            <strong>{booking.pc_name}</strong>
-                            <span>
-                              {booking.date} at {booking.time}
-                            </span>
-                            <span className="pill">{booking.status}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="empty-copy">No bookings yet.</p>
-                      )}
                     </div>
 
                     <div className="content-card">
@@ -1581,81 +1436,6 @@ function App() {
                 </section>
               ) : null}
 
-              {activeTab === 'bookings' ? (
-                <section className="content-stack">
-                  <form className="content-card" onSubmit={submitBooking}>
-                    <h3>Create booking</h3>
-                    <p className="section-copy">
-                      Only free PCs are shown here, so customers are choosing from stations that are ready now.
-                    </p>
-                    <label className="field-label" htmlFor="pcSelect">
-                      PC
-                    </label>
-                    <select
-                      id="pcSelect"
-                      className="text-field"
-                      onChange={(event) => setSelectedPcId(event.target.value)}
-                      value={selectedPcId}
-                    >
-                      <option value="">Select a free PC</option>
-                      {availablePcs.map((pc) => (
-                        <option key={pc.id} value={pc.id}>
-                          {pc.name}
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="two-column-grid compact">
-                      <div>
-                        <label className="field-label" htmlFor="bookingDate">
-                          Date
-                        </label>
-                        <input
-                          id="bookingDate"
-                          className="text-field"
-                          onChange={(event) => setBookingDate(event.target.value)}
-                          type="date"
-                          value={bookingDate}
-                        />
-                      </div>
-                      <div>
-                        <label className="field-label" htmlFor="bookingTime">
-                          Time
-                        </label>
-                        <input
-                          id="bookingTime"
-                          className="text-field"
-                          onChange={(event) => setBookingTime(event.target.value)}
-                          type="time"
-                          value={bookingTime}
-                        />
-                      </div>
-                    </div>
-
-                    <button className="primary-button" disabled={bookingBusy} type="submit">
-                      {bookingBusy ? 'Saving booking...' : 'Book now'}
-                    </button>
-                  </form>
-
-                  <div className="content-card">
-                    <h3>Existing bookings</h3>
-                    {bookings.length > 0 ? (
-                      bookings.map((booking, index) => (
-                        <div className="list-item" key={`${booking.pc_name}-${booking.date}-${index}`}>
-                          <strong>{booking.pc_name}</strong>
-                          <span>
-                            {booking.date} at {booking.time}
-                          </span>
-                          <span className="pill">{booking.status}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="empty-copy">No bookings found for this account.</p>
-                    )}
-                  </div>
-                </section>
-              ) : null}
-
               {activeTab === 'profile' ? (
                 <section className="content-stack">
                   <div className="content-card">
@@ -1664,7 +1444,6 @@ function App() {
                       <>
                         <div className="list-item"><strong>{profile.full_name}</strong><span>{profile.role}</span></div>
                         <div className="list-item"><strong>Username</strong><span>{profile.username}</span></div>
-                        <div className="list-item"><strong>Balance</strong><span>{formatCurrency(profile.balance)}</span></div>
                       </>
                     ) : <p className="empty-copy">Sign in to view your account profile.</p>}
                     <p className="section-copy">{profile?.has_profile_picture ? 'A profile picture is saved.' : 'No profile picture is saved.'} Enter your current password to make a change.</p>
@@ -1704,7 +1483,7 @@ function App() {
                 </section>
               ) : null}
 
-              {activeTab === 'products' ? (
+              {activeTab === 'equipment' ? (
                 <section className="content-stack">
                   <div className="content-card product-scan-card">
                     <div className="panel-head">
@@ -1739,78 +1518,26 @@ function App() {
                           <span className={statusPillClass(scannedEquipment.status)}>{scannedEquipment.status}</span>
                         </div>
                       </div>
+                      {scannedEquipment.can_request ? (
+                        <form className="content-card" onSubmit={submitBorrowRequest}>
+                          <h3>Request this equipment</h3>
+                          <label className="field-label" htmlFor="borrowPurpose">Purpose</label>
+                          <input id="borrowPurpose" className="text-field" onChange={(event) => setBorrowPurpose(event.target.value)} value={borrowPurpose} required />
+                          <label className="field-label" htmlFor="expectedReturn">Expected return date</label>
+                          <input id="expectedReturn" className="text-field" onChange={(event) => setExpectedReturn(event.target.value)} type="date" value={expectedReturn} required />
+                          <button className="primary-button" disabled={requestBusy} type="submit">{requestBusy ? 'Sending...' : 'Send borrow request'}</button>
+                        </form>
+                      ) : null}
+                      <form className="content-card" onSubmit={submitEquipmentIssue}>
+                        <h3>Report an issue</h3>
+                        <label className="field-label" htmlFor="issueTitle">Issue type</label>
+                        <input id="issueTitle" className="text-field" onChange={(event) => setIssueTitle(event.target.value)} placeholder="Damage, malfunction, missing accessory..." value={issueTitle} required />
+                        <label className="field-label" htmlFor="issueDescription">Description</label>
+                        <textarea id="issueDescription" className="text-area" onChange={(event) => setIssueDescription(event.target.value)} value={issueDescription} required rows={4} />
+                        <button className="secondary-button" disabled={issueBusy} type="submit">{issueBusy ? 'Submitting...' : 'Submit issue report'}</button>
+                      </form>
                     </>
                   ) : <div className="content-card"><p className="empty-copy">Scan an equipment QR code to load its record.</p></div>}
-                </section>
-              ) : null}
-
-              {activeTab === 'topup' ? (
-                <form className="content-card" onSubmit={submitTopup}>
-                  <h3>Create top-up request</h3>
-                  <p className="section-copy">
-                    Submit a balance request to the live server. The updated amount is written back to this device after approval.
-                  </p>
-                  <label className="field-label" htmlFor="topupAmount">
-                    Amount
-                  </label>
-                  <input
-                    id="topupAmount"
-                    className="text-field"
-                    inputMode="decimal"
-                    onChange={(event) => setTopupAmount(event.target.value)}
-                    type="number"
-                    value={topupAmount}
-                  />
-
-                  <div className="quick-grid">
-                    {QUICK_TOPUP_AMOUNTS.map((amount) => (
-                      <button
-                        key={amount}
-                        className="ghost-button"
-                        onClick={() => setTopupAmount(String(amount))}
-                        type="button"
-                      >
-                        {formatCurrency(amount)}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button className="primary-button" disabled={topupBusy} type="submit">
-                    {topupBusy ? 'Submitting...' : 'Submit request'}
-                  </button>
-                </form>
-              ) : null}
-
-              {activeTab === 'assistant' ? (
-                <section className="content-stack">
-                  <div className="content-card chat-log">
-                    <h3>Assistant</h3>
-                    <p className="section-copy">
-                      This assistant stays inside the existing Techpuls mobile API surface and can answer account and booking questions.
-                    </p>
-                    {assistantMessages.map((message) => (
-                      <div className={`chat-bubble ${message.role}`} key={message.id}>
-                        <span>{message.role}</span>
-                        <p>{message.text}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <form className="content-card" onSubmit={submitAssistantMessage}>
-                    <label className="field-label" htmlFor="assistantInput">
-                      Ask about bookings, balance, or cafe updates
-                    </label>
-                    <textarea
-                      id="assistantInput"
-                      className="text-area"
-                      onChange={(event) => setAssistantInput(event.target.value)}
-                      rows={4}
-                      value={assistantInput}
-                    />
-                    <button className="primary-button" disabled={assistantBusy} type="submit">
-                      {assistantBusy ? 'Sending...' : 'Send message'}
-                    </button>
-                  </form>
                 </section>
               ) : null}
 
@@ -1834,12 +1561,24 @@ function App() {
               ) : null}
             </div>
           ) : (
-            <form className="login-form" onSubmit={handleLogin}>
+            <form className="login-form" onSubmit={creatingAccount ? handleRegister : handleLogin}>
               <p className="login-copy">
-                Use a customer account from the existing Techpuls server. The phone app
-                connects over LAN, keeps the UI local inside the APK, and can pair from
-                the desktop QR scanner flow.
+                {creatingAccount
+                  ? 'Create a borrower account for equipment requests and issue reporting.'
+                  : 'Sign in with a student or instructor account. The APK keeps its interface local and connects to TechPulse through the paired server.'}
               </p>
+
+              {creatingAccount ? (
+                <>
+                  <label className="field-label" htmlFor="accountFullName">Full name</label>
+                  <input id="accountFullName" className="text-field" onChange={(event) => setAccountFullName(event.target.value)} type="text" value={accountFullName} />
+                  <label className="field-label" htmlFor="accountRole">Account type</label>
+                  <select id="accountRole" className="text-field" onChange={(event) => setAccountRole(event.target.value as 'student' | 'instructor')} value={accountRole}>
+                    <option value="student">Student</option>
+                    <option value="instructor">Instructor</option>
+                  </select>
+                </>
+              ) : null}
 
               <label className="field-label" htmlFor="username">
                 Username
@@ -1868,7 +1607,10 @@ function App() {
                 disabled={loginBusy || connectionStatus === 'testing'}
                 type="submit"
               >
-                {loginBusy ? 'Signing in...' : 'Sign in'}
+                {loginBusy ? (creatingAccount ? 'Creating account...' : 'Signing in...') : (creatingAccount ? 'Create account' : 'Sign in')}
+              </button>
+              <button className="ghost-button" disabled={loginBusy} onClick={() => setCreatingAccount((value) => !value)} type="button">
+                {creatingAccount ? 'I already have an account' : 'Create a borrower account'}
               </button>
             </form>
           )}
