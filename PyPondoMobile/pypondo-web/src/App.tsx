@@ -42,10 +42,40 @@ function normalizeServerAddress(value: string) {
   const hasScheme = /^https?:\/\//i.test(trimmed)
   const url = new URL(hasScheme ? trimmed : 'http://' + trimmed)
   if (!hasScheme && !url.port) url.port = '5000'
-  url.pathname = ''
+  url.pathname = url.pathname.replace(/\/+$/, '')
   url.search = ''
   url.hash = ''
   return url.toString().replace(/\/$/, '')
+}
+
+function parseEquipmentQr(rawValue: string): { qrValue: string; serverBaseUrl?: string } {
+  const value = rawValue.trim()
+  try {
+    const url = new URL(value)
+    const equipmentPath = '/mobile/equipment/'
+    const markerIndex = url.pathname.lastIndexOf(equipmentPath)
+    if (markerIndex >= 0) {
+      const encodedQr = url.pathname.slice(markerIndex + equipmentPath.length).replace(/\/$/, '')
+      if (encodedQr) {
+        return {
+          qrValue: decodeURIComponent(encodedQr),
+          serverBaseUrl: url.origin + url.pathname.slice(0, markerIndex),
+        }
+      }
+    }
+
+    const scanApiPath = '/api/equipment/scan'
+    if (url.pathname.endsWith(scanApiPath)) {
+      const qrValue = url.searchParams.get('qr')
+      if (qrValue) {
+        const prefix = url.pathname.slice(0, -scanApiPath.length)
+        return { qrValue, serverBaseUrl: url.origin + prefix }
+      }
+    }
+  } catch {
+    // Existing equipment labels contain a plain token instead of a link.
+  }
+  return { qrValue: value }
 }
 
 function addressFromDiscoveredServer(server: DiscoveredServer) {
@@ -183,7 +213,8 @@ function App() {
   }
 
   async function handleScannedQr(rawValue: string) {
-    const value = rawValue.trim()
+    const scannedQr = parseEquipmentQr(rawValue)
+    const value = scannedQr.qrValue.trim()
     if (!value) return
 
     setEquipment(null)
@@ -195,7 +226,16 @@ function App() {
     setNotice({ kind: 'info', message: 'Looking up the equipment…' })
 
     try {
-      const system = await findSystem()
+      let system: string | null
+      if (scannedQr.serverBaseUrl) {
+        try {
+          system = await trySystemAtAddress(scannedQr.serverBaseUrl)
+        } catch {
+          system = await findSystem(true)
+        }
+      } else {
+        system = await findSystem()
+      }
       if (!system) {
         throw new Error('Could not find the system. Make sure your phone is on the same network, then retry.')
       }
@@ -528,7 +568,7 @@ function App() {
               autoCapitalize="off"
               autoCorrect="off"
               onChange={(event) => setManualCode(event.target.value)}
-              placeholder="Equipment QR code"
+              placeholder="Equipment QR code or link"
               required
               value={manualCode}
             />

@@ -14,7 +14,7 @@
     {% endwith %}
     <div class="eyebrow">TechPulse equipment identification</div>
     <h1>{{ item.equipment_name }}</h1>
-    <p class="description">Unique QR label for this registered equipment</p>
+    <p class="description">Scan this label with a phone to open this equipment record and student scan form.</p>
     {% if qr %}
       <span class="status {{ 'active' if qr.is_active else 'inactive' }}">{{ 'Active' if qr.is_active else 'Inactive' }}</span>
     {% else %}
@@ -31,7 +31,7 @@
       {% if item.serial_number %}<span>Serial: {{ item.serial_number }}</span>{% endif %}
       {% if qr and qr.generated_at %}<span>Generated: {{ qr.generated_at.strftime('%Y-%m-%d %H:%M') }}</span>{% endif %}
     </div>
-    {% if qr %}<div class="payload">{{ qr.qr_value }}</div>{% endif %}
+    {% if qr %}<div class="payload"><strong>Mobile equipment link</strong><br><a href="{{ qr_link }}">{{ qr_link }}</a><br><small>QR value for manual scanning: {{ qr.qr_value }}</small></div>{% endif %}
     <div class="actions">
       {% if qr %}
         <button type="button" onclick="window.print()">Print label</button>

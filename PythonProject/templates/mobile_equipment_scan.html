@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#244f7e">
+  <title>{{ equipment.equipment_name if equipment else 'Equipment scan' }} | TechPulse</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, "Segoe UI", Arial, sans-serif; color: #30445d; background: #f1f5fa; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; padding: 22px 14px 34px; }
+    main { width: min(100%, 520px); margin: 0 auto; }
+    .brand { display: flex; align-items: center; gap: 10px; margin: 0 0 20px; color: #274f7d; font-size: .82rem; font-weight: 800; letter-spacing: .1em; }
+    .brand-mark { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 12px; color: #fff; background: #315f94; letter-spacing: -.04em; }
+    .card { padding: 22px; border: 1px solid #dfe7f0; border-radius: 18px; background: #fff; box-shadow: 0 8px 28px rgba(35, 55, 82, .07); }
+    .eyebrow { margin: 0 0 7px; color: #6882a0; font-size: .68rem; font-weight: 800; letter-spacing: .12em; }
+    h1, h2 { margin: 0; color: #203956; letter-spacing: -.025em; }
+    h1 { font-size: 1.45rem; }
+    h2 { margin-top: 22px; font-size: 1.12rem; }
+    .equipment-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .equipment-meta span { padding: 6px 9px; border: 1px solid #e3eaf2; border-radius: 8px; color: #697d94; background: #f7f9fc; font-size: .76rem; }
+    .status { background: #edf6f0 !important; color: #367353 !important; }
+    .intro { margin: 13px 0 0; color: #718198; font-size: .88rem; line-height: 1.5; }
+    .message { margin: 0 0 16px; padding: 12px 13px; border: 1px solid #d5e7dc; border-radius: 10px; color: #317255; background: #f1f8f4; font-size: .86rem; }
+    .message.error { border-color: #f0d4d5; color: #a14f53; background: #fff5f5; }
+    form { display: grid; gap: 14px; margin-top: 16px; }
+    label { display: grid; gap: 7px; color: #52657d; font-size: .82rem; font-weight: 700; }
+    input { width: 100%; min-height: 47px; padding: 0 12px; border: 1px solid #d8e1eb; border-radius: 10px; outline: none; color: #283e59; background: #fff; font: inherit; font-size: .9rem; font-weight: 400; }
+    input:focus { border-color: #7aa2cf; box-shadow: 0 0 0 3px rgba(88, 137, 190, .12); }
+    button { min-height: 49px; margin-top: 3px; border: 0; border-radius: 11px; color: #fff; background: #2f659f; font: inherit; font-weight: 700; cursor: pointer; }
+    button:hover { background: #254f7e; }
+    .footer { margin: 15px 0 0; color: #8794a5; font-size: .73rem; line-height: 1.45; text-align: center; }
+    @media (max-width: 440px) { body { padding: 14px 10px 26px; } .card { padding: 18px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand"><span class="brand-mark">TP</span><span>TECHPULSE</span></div>
+    <section class="card">
+      {% if error_message %}<p class="message error" role="alert">{{ error_message }}</p>{% endif %}
+      {% if equipment %}
+        {% if saved %}<p class="message" role="status">Your details were saved to the TechPulse system.</p>{% endif %}
+        <p class="eyebrow">EQUIPMENT RECORD</p>
+        <h1>{{ equipment.equipment_name }}</h1>
+        <div class="equipment-meta">
+          <span>{{ equipment.equipment_code }}</span>
+          {% if equipment_details.category %}<span>{{ equipment_details.category }}</span>{% endif %}
+          {% if equipment_details.status %}<span class="status">{{ equipment_details.status }}</span>{% endif %}
+        </div>
+        <p class="intro">Enter your student details below to save this equipment scan.</p>
+        {% if not saved %}
+          <h2>Student details</h2>
+          <form method="post" action="{{ url_for('mobile_equipment_link', qr_value=qr_value) }}">
+            <label>Full name
+              <input name="full_name" autocomplete="name" maxlength="200" required value="{{ form_values.full_name if form_values is defined else '' }}" placeholder="Enter your full name">
+            </label>
+            <label>Program
+              <input name="program" autocomplete="organization-title" maxlength="160" required value="{{ form_values.program if form_values is defined else '' }}" placeholder="Enter your program">
+            </label>
+            <label>Year
+              <input name="year_level" maxlength="40" required value="{{ form_values.year_level if form_values is defined else '' }}" placeholder="e.g. 2nd year">
+            </label>
+            <button type="submit">Submit details</button>
+          </form>
+        {% endif %}
+      {% else %}
+        <p class="eyebrow">EQUIPMENT SCAN</p>
+        <h1>Equipment not found</h1>
+        <p class="intro">This QR link is invalid or no longer active. Ask staff for a current equipment label.</p>
+      {% endif %}
+    </section>
+    <p class="footer">Submitted details are saved with the equipment record and submission time.</p>
+  </main>
+</body>
+</html>

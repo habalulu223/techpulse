@@ -2856,10 +2856,12 @@ def build_public_server_payload():
     pairing_targets = get_mobile_pairing_targets(server_port)
     primary_target = pairing_targets[0] if pairing_targets else None
 
-    # If the primary target is localhost, prefer the machine's LAN IPv4
-    # so that mobile devices on the same network can reach the server
+    # If the primary target is loopback or an unspecified bind address, prefer
+    # the machine's LAN IPv4 so mobile devices can reach the server.
     try:
-        if primary_target and str(primary_target.get("ip", "") or "").strip() in ("127.0.0.1", "localhost"):
+        if primary_target and str(primary_target.get("ip", "") or "").strip().lower() in {
+            "127.0.0.1", "localhost", "0.0.0.0", "::", "::1"
+        }:
             local_ipv4 = get_primary_local_ipv4()
             if local_ipv4 and local_ipv4 not in ("127.0.0.1", "localhost"):
                 host = format_host_for_url(local_ipv4)
@@ -3370,29 +3372,25 @@ def api_equipment_scan():
     }}), 200
 
 
-@app.route('/api/equipment/scan-submissions', methods=['POST'])
-def api_equipment_scan_submission():
-    """Save the student's contact-free equipment scan details to the system."""
-    values = request.get_json(silent=True)
-    if not isinstance(values, dict):
-        values = request.form
-    qr_value = str(values.get('qr', '')).strip()
-    full_name = str(values.get('full_name', '')).strip()
-    program = str(values.get('program', '')).strip()
-    year_level = str(values.get('year_level', values.get('year', ''))).strip()
+def save_public_equipment_scan(qr_value, full_name, program, year_level):
+    """Validate and save a scan submitted from the mobile app or QR landing page."""
+    qr_value = str(qr_value or '').strip()
+    full_name = str(full_name or '').strip()
+    program = str(program or '').strip()
+    year_level = str(year_level or '').strip()
 
     if not qr_value or len(qr_value) > 255:
-        return jsonify({"ok": False, "error": "Scan a Techpuls equipment QR code first."}), 400
+        return None, None, 'Scan a Techpuls equipment QR code first.', 400
     if not full_name or len(full_name) > 200:
-        return jsonify({"ok": False, "error": "Enter your full name (up to 200 characters)."}), 400
+        return None, None, 'Enter your full name (up to 200 characters).', 400
     if not program or len(program) > 160:
-        return jsonify({"ok": False, "error": "Enter your program (up to 160 characters)."}), 400
+        return None, None, 'Enter your program (up to 160 characters).', 400
     if not year_level or len(year_level) > 40:
-        return jsonify({"ok": False, "error": "Enter your year level (up to 40 characters)."}), 400
+        return None, None, 'Enter your year level (up to 40 characters).', 400
 
     qr = CommunityEquipmentQRCode.query.filter_by(qr_value=qr_value, is_active=True).first()
     if not qr or not qr.equipment:
-        return jsonify({"ok": False, "error": "This equipment QR code is unknown or has been deactivated."}), 404
+        return None, None, 'This equipment QR code is unknown or has been deactivated.', 404
 
     submission = CommunityEquipmentScanSubmission(
         equipment_id=qr.equipment.equipment_id,
@@ -3402,11 +3400,52 @@ def api_equipment_scan_submission():
     )
     db.session.add(submission)
     db.session.commit()
+    return submission, qr, None, 201
+
+
+@app.route('/api/equipment/scan-submissions', methods=['POST'])
+def api_equipment_scan_submission():
+    """Save the student's account-free equipment scan details to the system."""
+    values = request.get_json(silent=True)
+    if not isinstance(values, dict):
+        values = request.form
+    submission, _qr, error_message, status_code = save_public_equipment_scan(
+        values.get('qr'), values.get('full_name'), values.get('program'),
+        values.get('year_level', values.get('year')))
+    if error_message:
+        return jsonify({"ok": False, "error": error_message}), status_code
     return jsonify({
         "ok": True,
         "submission_id": submission.submission_id,
         "message": "Your equipment scan details were saved to the system.",
     }), 201
+
+
+@app.route('/mobile/equipment/<qr_value>', methods=['GET', 'POST'])
+def mobile_equipment_link(qr_value):
+    """Open a phone-friendly equipment page directly from a printed QR label."""
+    qr = CommunityEquipmentQRCode.query.filter_by(qr_value=qr_value, is_active=True).first()
+    if not qr or not qr.equipment:
+        return render_template('mobile_equipment_scan.html', equipment=None,
+            error_message='This equipment QR code is unknown or has been deactivated.'), 404
+
+    form_values = {
+        'full_name': str(request.form.get('full_name', '')).strip(),
+        'program': str(request.form.get('program', '')).strip(),
+        'year_level': str(request.form.get('year_level', '')).strip(),
+    }
+    if request.method == 'POST':
+        _submission, saved_qr, error_message, status_code = save_public_equipment_scan(
+            qr.qr_value, form_values['full_name'], form_values['program'], form_values['year_level'])
+        if error_message:
+            return render_template('mobile_equipment_scan.html', equipment=qr.equipment,
+                equipment_details=serialize_mobile_equipment(qr.equipment), qr_value=qr.qr_value,
+                form_values=form_values, error_message=error_message), status_code
+        return redirect(url_for('mobile_equipment_link', qr_value=saved_qr.qr_value, saved='1'), code=303)
+
+    return render_template('mobile_equipment_scan.html', equipment=qr.equipment,
+        equipment_details=serialize_mobile_equipment(qr.equipment), qr_value=qr.qr_value,
+        form_values=form_values, saved=request.args.get('saved') == '1')
 
 
 def serialize_mobile_borrowing(borrowing):
@@ -4867,12 +4906,24 @@ def community_update_status(equipment_id):
 
 
 def equipment_qr_value(item):
-    """Single source of truth for the label payload format.
+    """Mint the token stored behind each equipment QR link.
 
-    Every place that mints or rotates a code must use this, otherwise codes of
-    different shapes end up in the same table and scanners stop matching them.
+    Every place that mints or rotates a code uses this token; the printed QR
+    wraps it in a direct URL to the mobile equipment page.
     """
     return f'PYPONDO-EQUIPMENT:{item.equipment_code}:{uuid.uuid4().hex[:12]}'
+
+
+def equipment_mobile_url(qr):
+    """Build the system URL encoded into a phone-scannable equipment label."""
+    payload = build_public_server_payload()
+    base_url = str(payload.get('server_base_url') or request.url_root).strip().rstrip('/')
+    parsed = http_parse.urlsplit(base_url)
+    if not parsed.scheme or not parsed.netloc:
+        parsed = http_parse.urlsplit(request.url_root.rstrip('/'))
+    prefix = parsed.path.rstrip('/')
+    equipment_path = f"{prefix}/mobile/equipment/{http_parse.quote(qr.qr_value, safe=':')}"
+    return http_parse.urlunsplit((parsed.scheme, parsed.netloc, equipment_path, '', ''))
 
 
 def equipment_qr_visible_to(item):
@@ -4896,7 +4947,8 @@ def community_equipment_qr(equipment_id):
     # Read-only: a GET must never mint a code. Codes are created when the item
     # is registered, or explicitly via the 'create' action on the POST route.
     qr = CommunityEquipmentQRCode.query.filter_by(equipment_id=equipment_id).first()
-    return render_template('equipment_qr.html', qr=qr, item=item)
+    return render_template('equipment_qr.html', qr=qr, item=item,
+        qr_link=equipment_mobile_url(qr) if qr else None)
 
 
 @app.route('/community/qr/<int:equipment_id>/image')
@@ -4913,7 +4965,7 @@ def community_equipment_qr_image(equipment_id):
         from qrcode.constants import ERROR_CORRECT_H
         from qrcode.image.svg import SvgPathImage
         qr_code = qrcode.QRCode(box_size=10, border=4, error_correction=ERROR_CORRECT_H)
-        qr_code.add_data(qr.qr_value)
+        qr_code.add_data(equipment_mobile_url(qr))
         qr_code.make(fit=True)
         image = qr_code.make_image(image_factory=SvgPathImage)
     except ImportError:

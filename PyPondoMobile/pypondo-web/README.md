@@ -65,6 +65,12 @@ npm run android:build
 - On Android the scanner opens the native camera through @capacitor/barcode-scanner; the browser
   build (npm run dev) uses the webcam with BarcodeDetector when supported.
 - The app finds the Techpuls system automatically on the local network.
+- New equipment labels encode a direct link to the system equipment page. Scanning with the phone's
+  built-in camera opens that page and form in the browser; scanning inside the app opens the item
+  directly in the scanner flow.
+- Older labels that contain only a QR token still work through automatic server discovery.
+- Reprint an existing label from the equipment QR page for the phone camera to open a direct system
+  link; token-only labels remain usable from the app scanner.
 - Scanning an equipment label loads its name, code, category, and status, then prompts for the
   student's full name, program, and year.
 - Submitting creates a mobile scan record that staff can view under **Equipment → Reports**.

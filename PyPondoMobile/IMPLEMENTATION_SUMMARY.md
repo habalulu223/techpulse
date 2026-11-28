@@ -12,7 +12,12 @@ network.
 4. Submit the form. The system saves the details with the equipment and submission time.
 5. Staff can review records under **Equipment → Reports** in the desktop system.
 
-If camera scanning is unavailable, the app provides a field for entering the QR value manually.
+New equipment labels contain a direct link to that equipment on the TechPulse system. Scanning the
+label with the phone's regular camera opens the same equipment page and student form in a browser.
+The in-app scanner reads the link and loads that equipment directly. Older labels with token-only
+QR values continue to work in the app through automatic system discovery; reprint those labels from
+the equipment QR page to make the phone camera open a system link. If camera scanning is unavailable,
+the app provides a field for entering the QR value or link manually.
 
 ## Implementation
 
