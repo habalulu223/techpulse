@@ -1,4 +1,4 @@
-# React + TypeScript + Vite
+﻿# React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
@@ -53,34 +53,29 @@ npm run android:build
 
 3. Open the APK file on your device and install it
 
-4. Launch the PyPondo app
+4. Launch the Techpuls app. It searches for the system automatically; keep the phone on the same
+   network as the system.
 
-5. Point the app at a server:
-   - Scan the pairing QR shown on the dashboard at `/mobile/pairing`, or
-   - Type the server address (e.g. `http://192.168.1.100:5000`) and tap Connect.
-
-   The app is configured to talk to local network servers over plain HTTP.
-
-6. Sign in with your PyPondo account. Every `/api/mobile` call now authenticates with the signed-in
-   token, so bookings, profile top-ups and equipment scans need a session — and can only touch your
-   own account.
+5. Tap **Scan equipment QR**, scan an equipment label, and enter your full name, program, and year.
+   Submit the form to save the scan details in the system. No mobile account or server setup is
+   required.
 
 ## Scanning QR codes
 
-- On Android the scanner opens the native camera through `@capacitor/barcode-scanner`; the browser
-  build (`npm run dev`) falls back to the webcam with `BarcodeDetector`.
-- Scanning a PyPondo server QR pairs the app with that server.
-- Scanning an equipment label opens its record — name, category, laboratory, brand/model/serial,
-  availability and status history. Scanning requires an account that manages or borrows equipment.
-- If a label is damaged or the camera cannot focus, type the label's code into the manual field on
-  the Products tab; it goes to the same lookup.
+- On Android the scanner opens the native camera through @capacitor/barcode-scanner; the browser
+  build (npm run dev) uses the webcam with BarcodeDetector when supported.
+- The app finds the Techpuls system automatically on the local network.
+- Scanning an equipment label loads its name, code, category, and status, then prompts for the
+  student's full name, program, and year.
+- Submitting creates a mobile scan record that staff can view under **Equipment → Reports**.
+- If camera access is unavailable, the student can enter the QR value manually.
 
 ## APK Features
 
 The built APK includes:
 - CyberCore-themed icon
 - Network security config allowing cleartext traffic on local networks (192.168.x.x, 10.x.x.x, 172.16.x.x)
-- CAMERA permission and the native Capacitor barcode scanner for QR pairing and equipment labels
+- CAMERA permission and the native Capacitor barcode scanner for equipment labels
 - INTERNET permission for server communication
 - Proper Android manifest for Capacitor web app wrapper
 

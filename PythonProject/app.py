@@ -60,7 +60,8 @@ app = Flask(
 # port-qualified entries alone leave every mobile preflight refused.
 MOBILE_WEBVIEW_ORIGINS = ['http://localhost', 'https://localhost', 'capacitor://localhost']
 default_allowed_origins = ','.join(
-    ['http://localhost:3000', 'http://localhost:5000', 'http://127.0.0.1:5000'] + MOBILE_WEBVIEW_ORIGINS)
+    ['http://localhost:3000', 'http://localhost:5000', 'http://127.0.0.1:5000',
+     'http://localhost:5173', 'http://127.0.0.1:5173'] + MOBILE_WEBVIEW_ORIGINS)
 allowed_origins = os.getenv('ALLOWED_ORIGINS', default_allowed_origins).split(',')
 
 CORS(app, resources={
@@ -774,6 +775,18 @@ class CommunityEquipmentQRCode(db.Model):
     generated_at = db.Column(db.DateTime, nullable=False, default=datetime.now, server_default=text('CURRENT_TIMESTAMP'))
     is_active = db.Column(db.Boolean, nullable=False, default=True, server_default=text('1'))
     __table_args__ = (db.CheckConstraint('is_active IN (0, 1)'),)
+    equipment = db.relationship('CommunityEquipment')
+
+
+class CommunityEquipmentScanSubmission(db.Model):
+    __bind_key__ = 'community'
+    __tablename__ = 'equipment_scan_submissions'
+    submission_id = db.Column(db.Integer, primary_key=True)
+    equipment_id = db.Column(db.Integer, db.ForeignKey('equipment.equipment_id'), nullable=False, index=True)
+    full_name = db.Column(db.String(200), nullable=False)
+    program = db.Column(db.String(160), nullable=False)
+    year_level = db.Column(db.String(40), nullable=False)
+    submitted_at = db.Column(db.DateTime, nullable=False, default=datetime.now, server_default=text('CURRENT_TIMESTAMP'), index=True)
     equipment = db.relationship('CommunityEquipment')
 
 
@@ -3335,6 +3348,67 @@ def mobile_equipment_history(equipment_id, limit=5):
     } for row in rows]
 
 
+@app.route('/api/equipment/scan')
+def api_equipment_scan():
+    """Resolve a public equipment label for the account-free mobile scanner."""
+    qr_value = str(request.args.get('qr', '')).strip()
+    if not qr_value or len(qr_value) > 255:
+        return jsonify({"ok": False, "error": "Scan a Techpuls equipment QR code."}), 400
+
+    qr = CommunityEquipmentQRCode.query.filter_by(qr_value=qr_value, is_active=True).first()
+    if not qr or not qr.equipment:
+        return jsonify({"ok": False, "error": "This equipment QR code is unknown or has been deactivated."}), 404
+
+    item = qr.equipment
+    details = serialize_mobile_equipment(item)
+    return jsonify({"ok": True, "equipment": {
+        "equipment_id": item.equipment_id,
+        "equipment_code": item.equipment_code,
+        "equipment_name": item.equipment_name,
+        "category": details.get("category"),
+        "status": details.get("status"),
+    }}), 200
+
+
+@app.route('/api/equipment/scan-submissions', methods=['POST'])
+def api_equipment_scan_submission():
+    """Save the student's contact-free equipment scan details to the system."""
+    values = request.get_json(silent=True)
+    if not isinstance(values, dict):
+        values = request.form
+    qr_value = str(values.get('qr', '')).strip()
+    full_name = str(values.get('full_name', '')).strip()
+    program = str(values.get('program', '')).strip()
+    year_level = str(values.get('year_level', values.get('year', ''))).strip()
+
+    if not qr_value or len(qr_value) > 255:
+        return jsonify({"ok": False, "error": "Scan a Techpuls equipment QR code first."}), 400
+    if not full_name or len(full_name) > 200:
+        return jsonify({"ok": False, "error": "Enter your full name (up to 200 characters)."}), 400
+    if not program or len(program) > 160:
+        return jsonify({"ok": False, "error": "Enter your program (up to 160 characters)."}), 400
+    if not year_level or len(year_level) > 40:
+        return jsonify({"ok": False, "error": "Enter your year level (up to 40 characters)."}), 400
+
+    qr = CommunityEquipmentQRCode.query.filter_by(qr_value=qr_value, is_active=True).first()
+    if not qr or not qr.equipment:
+        return jsonify({"ok": False, "error": "This equipment QR code is unknown or has been deactivated."}), 404
+
+    submission = CommunityEquipmentScanSubmission(
+        equipment_id=qr.equipment.equipment_id,
+        full_name=full_name,
+        program=program,
+        year_level=year_level,
+    )
+    db.session.add(submission)
+    db.session.commit()
+    return jsonify({
+        "ok": True,
+        "submission_id": submission.submission_id,
+        "message": "Your equipment scan details were saved to the system.",
+    }), 201
+
+
 def serialize_mobile_borrowing(borrowing):
     return {
         "borrowing_id": borrowing.borrowing_id,
@@ -4139,6 +4213,8 @@ def equipment_dashboard():
     community_users = CommunityUser.query.order_by(CommunityUser.first_name, CommunityUser.last_name).all() if dashboard_view == 'users' else []
     history = CommunityEquipmentStatusHistory.query.order_by(
         CommunityEquipmentStatusHistory.changed_at.desc()).limit(50).all() if dashboard_view == 'reports' else []
+    scan_submissions = CommunityEquipmentScanSubmission.query.order_by(
+        CommunityEquipmentScanSubmission.submitted_at.desc()).limit(200).all() if dashboard_view == 'reports' else []
     return render_template('community_equipment.html', equipment=equipment,
         categories=categories, laboratories=laboratories, statuses=statuses, priorities=priorities,
         pending_borrowings=pending_borrowings, active_borrowings=active_borrowings,
@@ -4146,7 +4222,7 @@ def equipment_dashboard():
         borrowing_history=borrowing_history, return_inspections=return_inspections,
         community_users=community_users, maintenance_records=maintenance_records,
         notifications=notifications, audit_logs=audit_logs,
-        history=history,
+        history=history, scan_submissions=scan_submissions,
         equipment_status=equipment_status, is_manager=True, role=current_user.role,
         dashboard_view=dashboard_view, dashboard_tabs=dashboard_tabs,
         borrower_search=borrower_search, now=datetime.now(),
